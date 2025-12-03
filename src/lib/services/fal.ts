@@ -16,12 +16,33 @@ function ensureFalConfigured() {
  * Get the webhook URL for fal.ai callbacks
  */
 function getWebhookUrl(): string {
-  const baseUrl = process.env.RAILWAY_PUBLIC_DOMAIN 
-    ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
-    : process.env.NEXT_PUBLIC_BASE_URL 
-    || 'http://localhost:3001'
+  // Railway provides RAILWAY_PUBLIC_DOMAIN (just the domain, no protocol)
+  // or we can construct from RAILWAY_STATIC_URL
+  let baseUrl: string
   
-  return `${baseUrl}/api/webhooks/fal`
+  if (process.env.RAILWAY_PUBLIC_DOMAIN) {
+    baseUrl = `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+  } else if (process.env.RAILWAY_STATIC_URL) {
+    baseUrl = process.env.RAILWAY_STATIC_URL
+  } else if (process.env.NEXT_PUBLIC_APP_URL) {
+    baseUrl = process.env.NEXT_PUBLIC_APP_URL
+  } else if (process.env.VERCEL_URL) {
+    baseUrl = `https://${process.env.VERCEL_URL}`
+  } else {
+    baseUrl = 'http://localhost:3001'
+  }
+  
+  const webhookUrl = `${baseUrl}/api/webhooks/fal`
+  console.log(`🔗 Webhook URL: ${webhookUrl}`)
+  
+  return webhookUrl
+}
+
+/**
+ * Export webhook URL for debugging
+ */
+export function getWebhookUrlForDebug(): string {
+  return getWebhookUrl()
 }
 
 /**

@@ -42,8 +42,9 @@ interface GenerateAudioOptions {
 export interface AudioChunk {
   url: string
   text: string
-  index: number
-  section: 'introduction' | 'article' | 'conclusion'
+  chunkIndex: number
+  duration?: number
+  section?: 'introduction' | 'article' | 'conclusion'
   articleTitle?: string
 }
 
@@ -79,7 +80,7 @@ export async function mergeAudioChunks(chunks: AudioChunk[], maxDuration: number
         mergedChunks.push({
           url: mergedUrl,
           text: currentBatch.map(c => c.text).join(' '),
-          index: mergedChunks.length,
+          chunkIndex: mergedChunks.length,
           section: currentBatch[0].section,
           articleTitle: currentBatch[0].articleTitle,
         })
@@ -103,7 +104,7 @@ export async function mergeAudioChunks(chunks: AudioChunk[], maxDuration: number
       mergedChunks.push({
         url: mergedUrl,
         text: currentBatch.map(c => c.text).join(' '),
-        index: mergedChunks.length,
+        chunkIndex: mergedChunks.length,
         section: currentBatch[0].section,
         articleTitle: currentBatch[0].articleTitle,
       })
@@ -197,7 +198,7 @@ export async function generateAudio({
         audioChunks.push({
           url: result.data.audio.url,
           text: scriptChunk.text,
-          index: scriptChunk.index,
+          chunkIndex: scriptChunk.index,
           section: scriptChunk.section,
           articleTitle: scriptChunk.articleTitle,
         })

@@ -11,9 +11,10 @@ import { Loader2, Download, X, Volume2 } from 'lucide-react'
 interface AudioChunk {
   url: string
   text: string
-  index: number
-  section: 'introduction' | 'article' | 'conclusion'
+  chunkIndex: number
+  section?: 'introduction' | 'article' | 'conclusion'
   articleTitle?: string
+  duration?: number
 }
 
 interface StepThreeProps {
@@ -230,11 +231,11 @@ export default function StepThree({ script, existingAudioChunks, podcastId, onBa
                     <h3 className="font-semibold mb-2 text-sm flex items-center justify-between">
                       <span className="flex items-center">
                         <Volume2 className="mr-2 h-4 w-4" />
-                        Segment {chunk.index + 1}/{audioChunks.length}
+                        Segment {chunk.chunkIndex + 1}/{audioChunks.length}
                       </span>
                       <a 
                         href={chunk.url} 
-                        download={`podcast-segment-${chunk.index + 1}.mp3`}
+                        download={`podcast-segment-${chunk.chunkIndex + 1}.mp3`}
                         className="text-blue-600 hover:underline text-xs"
                       >
                         Télécharger

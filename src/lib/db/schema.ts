@@ -21,6 +21,8 @@ export interface AudioChunk {
   chunkIndex: number
   duration?: number
   text: string
+  section?: 'introduction' | 'article' | 'conclusion'
+  articleTitle?: string
 }
 
 /**

@@ -39,6 +39,19 @@ RUN chown nextjs:nodejs .next
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
+# Copy drizzle config and schema for migrations
+COPY --from=builder --chown=nextjs:nodejs /app/drizzle.config.ts ./
+COPY --from=builder --chown=nextjs:nodejs /app/src/lib/db ./src/lib/db
+COPY --from=builder --chown=nextjs:nodejs /app/drizzle ./drizzle
+COPY --from=builder --chown=nextjs:nodejs /app/package.json ./
+
+# Install only drizzle-kit for migrations (as root before switching user)
+RUN npm install drizzle-kit postgres drizzle-orm
+
+# Copy startup script
+COPY --from=builder --chown=nextjs:nodejs /app/scripts/start.sh ./start.sh
+RUN chmod +x ./start.sh
+
 USER nextjs
 
 EXPOSE 3000
@@ -46,5 +59,5 @@ EXPOSE 3000
 ENV PORT 3000
 ENV HOSTNAME "0.0.0.0"
 
-CMD ["node", "server.js"]
+CMD ["./start.sh"]
 

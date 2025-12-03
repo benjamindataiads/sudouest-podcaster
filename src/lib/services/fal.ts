@@ -377,29 +377,62 @@ export async function generateVideo({
 
       console.log(`✅ Submitted with request_id: ${request_id}`)
 
-      // ÉTAPE 2: Attendre le résultat avec queue.result
-      console.log('Waiting for result...')
+      // ÉTAPE 2: Poll status until COMPLETED
+      console.log('Polling for status...')
+      let status = 'IN_QUEUE'
+      let pollAttempts = 0
+      const maxPollAttempts = 300 // 5 minutes max for video (video takes longer)
+      
+      while (status !== 'COMPLETED' && pollAttempts < maxPollAttempts) {
+        pollAttempts++
+        try {
+          const statusResponse = await fal.queue.status('fal-ai/kling-video/v1/standard/ai-avatar', {
+            requestId: request_id,
+            logs: false,
+          })
+          status = statusResponse.status
+          
+          if (status === 'FAILED') {
+            throw new Error(`Fal.ai video job failed`)
+          }
+          
+          if (pollAttempts % 10 === 0) {
+            console.log(`Video status: ${status} (poll ${pollAttempts}/${maxPollAttempts})`)
+          }
+          
+          if (status !== 'COMPLETED') {
+            await new Promise(resolve => setTimeout(resolve, 1000))
+          }
+        } catch (pollError) {
+          console.error('Poll error:', pollError)
+          await new Promise(resolve => setTimeout(resolve, 1000))
+        }
+      }
+      
+      if (status !== 'COMPLETED') {
+        throw new Error(`Timeout waiting for video (status: ${status})`)
+      }
+
+      // ÉTAPE 3: Get the result
+      console.log('Getting result...')
       const result = await fal.queue.result('fal-ai/kling-video/v1/standard/ai-avatar', {
         requestId: request_id,
-      }) as { data: { video: { url: string }, duration?: number } }
+      }) as { video: { url: string }, duration?: number }
 
       console.log('Raw result from fal.ai:', JSON.stringify(result, null, 2))
 
-      // Extraire les données
-      const videoResult = result.data
-      
-      // Vérifier que le résultat est valide
-      if (!videoResult || !videoResult.video || !videoResult.video.url) {
+      // Vérifier que le résultat est valide (response is directly { video: { url } })
+      if (!result || !result.video || !result.video.url) {
         throw new Error('Invalid response from fal.ai: missing video URL')
       }
 
       console.log(`✅ Video generated successfully on attempt ${attempt}`)
-      console.log(`Video URL: ${videoResult.video.url}`)
+      console.log(`Video URL: ${result.video.url}`)
       console.log(`Request ID: ${request_id}`)
       
       return {
-        videoUrl: videoResult.video.url,
-        duration: videoResult.duration || 0,
+        videoUrl: result.video.url,
+        duration: result.duration || 0,
         requestId: request_id,
       }
     } catch (error) {

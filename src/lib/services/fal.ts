@@ -168,23 +168,16 @@ export async function generateAudio({
     
     // Si des chunks de script sont fournis, les utiliser directement
     if (scriptChunks && scriptChunks.length > 0) {
-      console.log(`Generating audio from ${scriptChunks.length} script chunks using Minimax Voice Clone`)
+      console.log(`🚀 Generating ${scriptChunks.length} audio chunks IN PARALLEL using Minimax Voice Clone`)
       
-      const audioChunks: AudioChunk[] = []
+      if (onProgress) {
+        onProgress(10, `Soumission de ${scriptChunks.length} chunks audio en parallèle...`)
+      }
       
-      // Générer tous les chunks audio individuels
-      for (let i = 0; i < scriptChunks.length; i++) {
-        const scriptChunk = scriptChunks[i]
-        
-        // Mettre à jour la progression
-        if (onProgress) {
-          const progress = 10 + Math.floor((i / scriptChunks.length) * 80)
-          onProgress(progress, `Génération audio ${i + 1}/${scriptChunks.length}...`)
-        }
-        
-        console.log(`Generating audio chunk ${i + 1}/${scriptChunks.length} (${scriptChunk.text.length} chars)`)
-        
-        // ÉTAPE 1: Submit pour obtenir le request_id
+      // ÉTAPE 1: Soumettre TOUS les chunks en parallèle
+      console.log(`📤 Submitting all ${scriptChunks.length} chunks simultaneously...`)
+      const submitPromises = scriptChunks.map(async (scriptChunk, i) => {
+        console.log(`Submitting chunk ${i + 1}/${scriptChunks.length} (${scriptChunk.text.length} chars)`)
         const { request_id } = await fal.queue.submit('fal-ai/minimax/voice-clone', {
           input: {
             audio_url: REFERENCE_AUDIO_URL,
@@ -194,31 +187,96 @@ export async function generateAudio({
             need_volume_normalization: true,
           },
         })
-
-        console.log(`Audio chunk ${i + 1} submitted with request_id: ${request_id}`)
-
-        // ÉTAPE 2: Attendre le résultat
+        console.log(`✅ Chunk ${i + 1} submitted: ${request_id}`)
+        return { request_id, scriptChunk, index: i }
+      })
+      
+      const submittedJobs = await Promise.all(submitPromises)
+      console.log(`📤 All ${submittedJobs.length} chunks submitted!`)
+      
+      if (onProgress) {
+        onProgress(30, `${scriptChunks.length} chunks soumis, polling des statuts...`)
+      }
+      
+      // ÉTAPE 2: Polling - Attendre que TOUS les jobs soient COMPLETED
+      console.log(`⏳ Polling status for all ${submittedJobs.length} jobs...`)
+      let completedCount = 0
+      
+      const pollAndGetResult = async ({ request_id, scriptChunk, index }: { request_id: string, scriptChunk: ScriptChunk, index: number }): Promise<AudioChunk> => {
+        // Polling loop until COMPLETED
+        let status = 'IN_QUEUE'
+        let attempts = 0
+        const maxAttempts = 120 // 2 minutes max (polling every 1s)
+        
+        while (status !== 'COMPLETED' && attempts < maxAttempts) {
+          attempts++
+          try {
+            const statusResponse = await fal.queue.status('fal-ai/minimax/voice-clone', {
+              requestId: request_id,
+              logs: false,
+            })
+            status = statusResponse.status
+            
+            if (status === 'FAILED') {
+              throw new Error(`Fal.ai job failed for chunk ${index + 1}`)
+            }
+            
+            if (status !== 'COMPLETED') {
+              // Wait 1 second before next poll
+              await new Promise(resolve => setTimeout(resolve, 1000))
+            }
+          } catch (pollError) {
+            console.error(`Poll error for chunk ${index + 1}:`, pollError)
+            await new Promise(resolve => setTimeout(resolve, 1000))
+          }
+        }
+        
+        if (status !== 'COMPLETED') {
+          throw new Error(`Timeout waiting for chunk ${index + 1} (status: ${status})`)
+        }
+        
+        // ÉTAPE 3: Récupérer le résultat
         const result = await fal.queue.result('fal-ai/minimax/voice-clone', {
           requestId: request_id,
-        }) as { data: { audio: { url: string } } }
+        }) as { audio: { url: string } }
         
-        audioChunks.push({
-          url: result.data.audio.url,
+        console.log(`Raw audio result for chunk ${index + 1}:`, JSON.stringify(result, null, 2))
+        
+        // Le résultat est directement { audio: { url: ... } } sans wrapper "data"
+        const audioUrl = result?.audio?.url
+        
+        if (!audioUrl) {
+          console.error(`❌ No audio URL found in result for chunk ${index + 1}:`, result)
+          throw new Error(`No audio URL in response for chunk ${index + 1}`)
+        }
+        
+        completedCount++
+        console.log(`✅ Chunk ${index + 1} completed (${completedCount}/${submittedJobs.length}): ${audioUrl}`)
+        
+        if (onProgress) {
+          const progress = 30 + Math.floor((completedCount / submittedJobs.length) * 60)
+          onProgress(progress, `Audio ${completedCount}/${submittedJobs.length} terminé`)
+        }
+        
+        return {
+          url: audioUrl,
           text: scriptChunk.text,
           chunkIndex: scriptChunk.index,
           section: scriptChunk.section,
           articleTitle: scriptChunk.articleTitle,
-        })
-        
-        console.log(`✅ Audio chunk ${i + 1} completed: ${result.data.audio.url}`)
-        
-        console.log(`✅ Audio chunk ${i + 1}/${scriptChunks.length} generated`)
+        }
       }
       
-      console.log(`✅ Generated ${audioChunks.length} audio chunks`)
+      // Exécuter tous les polling/résultats en parallèle
+      const audioChunks = await Promise.all(submittedJobs.map(pollAndGetResult))
+      
+      // Trier par index pour maintenir l'ordre
+      audioChunks.sort((a, b) => a.chunkIndex - b.chunkIndex)
+      
+      console.log(`🎉 All ${audioChunks.length} audio chunks generated in parallel!`)
       
       if (onProgress) {
-        onProgress(95, 'Chunks audio générés avec succès')
+        onProgress(95, 'Tous les chunks audio générés avec succès!')
       }
       
       return {

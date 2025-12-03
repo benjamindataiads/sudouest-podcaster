@@ -128,8 +128,8 @@ export async function uploadFinalPodcastToBucket(
   
   await client.send(command)
   
-  const endpoint = process.env.BUCKET_ENDPOINT!
-  const publicUrl = `${endpoint}/${bucketName}/${key}`
+  // Railway storage URL format: https://{bucket-name}.storage.railway.app/{key}
+  const publicUrl = `https://${bucketName}.storage.railway.app/${key}`
   
   console.log(`✅ Final podcast uploaded: ${publicUrl}`)
   

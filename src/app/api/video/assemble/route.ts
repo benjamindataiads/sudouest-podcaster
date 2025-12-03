@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 export const dynamic = 'force-dynamic'
 import { concatenateVideos } from '@/lib/services/video-processor'
-import { addOverlaysToVideo } from '@/lib/services/video-processor'
+import { uploadFinalPodcastToBucket, isBucketConfigured } from '@/lib/services/storage'
 import path from 'path'
+import fs from 'fs/promises'
 
 /**
  * POST /api/video/assemble
@@ -25,13 +26,29 @@ export async function POST(request: NextRequest) {
     console.log(`Assembling ${videoUrls.length} video chunks:`)
     videoUrls.forEach((url, idx) => console.log(`  ${idx + 1}. ${url}`))
 
-    // Concaténer les vidéos (sans overlays pour éviter les problèmes de sync)
+    // Concaténer les vidéos
     const concatenatedPath = await concatenateVideos(videoUrls)
     
     console.log('✅ Videos concatenated successfully:', concatenatedPath)
 
-    // Retourner l'URL relative
-    const relativeUrl = concatenatedPath.replace(path.join(process.cwd(), 'public'), '')
+    let finalVideoUrl: string
+
+    // Upload to bucket if configured, otherwise use local path
+    if (isBucketConfigured() && podcastId) {
+      try {
+        console.log('📤 Uploading final video to bucket...')
+        finalVideoUrl = await uploadFinalPodcastToBucket(concatenatedPath, podcastId)
+        console.log(`✅ Uploaded to bucket: ${finalVideoUrl}`)
+        
+        // Clean up local file
+        await fs.unlink(concatenatedPath).catch(() => {})
+      } catch (uploadError) {
+        console.error('⚠️ Bucket upload failed, using local path:', uploadError)
+        finalVideoUrl = concatenatedPath.replace(path.join(process.cwd(), 'public'), '')
+      }
+    } else {
+      finalVideoUrl = concatenatedPath.replace(path.join(process.cwd(), 'public'), '')
+    }
 
     // Sauvegarder dans le podcast si podcastId fourni
     if (podcastId) {
@@ -40,18 +57,18 @@ export async function POST(request: NextRequest) {
       
       await db.update(podcasts)
         .set({
-          finalVideoUrl: relativeUrl,
+          finalVideoUrl: finalVideoUrl,
           status: 'completed',
           completedAt: new Date(),
           updatedAt: new Date(),
         })
         .where(eq(podcasts.id, podcastId))
       
-      console.log(`✅ Podcast ${podcastId} updated with final video: ${relativeUrl}`)
+      console.log(`✅ Podcast ${podcastId} updated with final video: ${finalVideoUrl}`)
     }
 
     return NextResponse.json({
-      videoUrl: relativeUrl,
+      videoUrl: finalVideoUrl,
       chunksAssembled: videoUrls.length,
     })
   } catch (error) {

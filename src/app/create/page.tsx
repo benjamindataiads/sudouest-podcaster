@@ -166,7 +166,7 @@ export default function CreatePodcastPage() {
     // Créer des placeholders pour l'audio
     const placeholders = (generatedScript.chunks || []).map((chunk, idx) => ({
       url: '',
-      index: idx,
+      chunkIndex: idx,
       text: chunk.text,
       section: chunk.section,
       articleTitle: chunk.articleTitle,
@@ -189,7 +189,7 @@ export default function CreatePodcastPage() {
       currentStep: 4,
       audioChunks: chunks || (audio ? [{ 
         url: audio, 
-        index: 0,
+        chunkIndex: 0,
         text: 'Audio complet',
         section: 'introduction' 
       }] : undefined),

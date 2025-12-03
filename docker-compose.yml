@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: always
+    container_name: sudouest_podcaster_db
+    environment:
+      POSTGRES_USER: podcaster
+      POSTGRES_PASSWORD: podcaster_dev
+      POSTGRES_DB: sudouest_podcaster
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "3001:3000"
+    environment:
+      DATABASE_URL: postgresql://podcaster:podcaster_dev@db:5432/sudouest_podcaster
+      FAL_KEY: ${FAL_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      BLOB_READ_WRITE_TOKEN: ${BLOB_READ_WRITE_TOKEN}
+    depends_on:
+      - db
+    volumes:
+      - ./public:/app/public
+
+volumes:
+  postgres_data:
+

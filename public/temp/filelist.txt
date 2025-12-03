@@ -1,0 +1,6 @@
+file '/Users/benjamincozon/sudouest-podcaster/public/temp/normalized-0.mp4'
+file '/Users/benjamincozon/sudouest-podcaster/public/temp/normalized-1.mp4'
+file '/Users/benjamincozon/sudouest-podcaster/public/temp/normalized-2.mp4'
+file '/Users/benjamincozon/sudouest-podcaster/public/temp/normalized-3.mp4'
+file '/Users/benjamincozon/sudouest-podcaster/public/temp/normalized-4.mp4'
+file '/Users/benjamincozon/sudouest-podcaster/public/temp/normalized-5.mp4'

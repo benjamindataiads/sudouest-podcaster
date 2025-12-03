@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db, podcasts } from '@/lib/db'
+import { db, podcasts, type NewPodcast } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 
 /**
@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
 
     // Si ID existe, mettre à jour
     if (id) {
-      const updateData: Record<string, unknown> = {
+      const updateData: Partial<NewPodcast> = {
         updatedAt: new Date(),
       }
       
@@ -58,19 +58,18 @@ export async function POST(request: NextRequest) {
     }
 
     // Sinon, créer un nouveau podcast
-    const insertData: Record<string, unknown> = {
+    const insertData: NewPodcast = {
       title: title || `Podcast ${new Date().toLocaleDateString('fr-FR')}`,
       status: status || 'draft',
       currentStep: currentStep || 1,
+      date: date ? new Date(date) : new Date(),
+      selectedArticles: selectedArticles || undefined,
+      script: script || undefined,
+      audioChunks: audioChunks || undefined,
+      videoUrls: videoUrls || undefined,
+      finalVideoUrl: finalVideoUrl || undefined,
+      estimatedDuration: estimatedDuration || undefined,
     }
-    
-    if (date) insertData.date = new Date(date)
-    if (selectedArticles) insertData.selectedArticles = selectedArticles
-    if (script) insertData.script = script
-    if (audioChunks) insertData.audioChunks = audioChunks
-    if (videoUrls) insertData.videoUrls = videoUrls
-    if (finalVideoUrl) insertData.finalVideoUrl = finalVideoUrl
-    if (estimatedDuration) insertData.estimatedDuration = estimatedDuration
 
     const [newPodcast] = await db
       .insert(podcasts)

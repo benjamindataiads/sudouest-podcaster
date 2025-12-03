@@ -4,6 +4,25 @@ import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
 export const dynamic = 'force-dynamic'
 
 /**
+ * GET /api/avatars/upload
+ * Check if bucket is configured
+ */
+export async function GET() {
+  const bucketEndpoint = process.env.BUCKET_ENDPOINT
+  const bucketName = process.env.BUCKET_NAME
+  const accessKeyId = process.env.BUCKET_ACCESS_KEY_ID
+  const secretAccessKey = process.env.BUCKET_SECRET_ACCESS_KEY
+  
+  return NextResponse.json({
+    configured: !!(bucketEndpoint && bucketName && accessKeyId && secretAccessKey),
+    endpoint: bucketEndpoint ? 'set' : 'missing',
+    bucketName: bucketName ? 'set' : 'missing',
+    accessKeyId: accessKeyId ? 'set' : 'missing',
+    secretAccessKey: secretAccessKey ? 'set' : 'missing',
+  })
+}
+
+/**
  * POST /api/avatars/upload
  * Upload avatar files (voice MP3 or image) to bucket
  */
@@ -36,25 +55,42 @@ export async function POST(request: NextRequest) {
     const accessKeyId = process.env.BUCKET_ACCESS_KEY_ID
     const secretAccessKey = process.env.BUCKET_SECRET_ACCESS_KEY
     
+    console.log('Bucket config:', {
+      endpoint: bucketEndpoint ? 'set' : 'missing',
+      bucketName: bucketName ? 'set' : 'missing',
+      accessKeyId: accessKeyId ? 'set' : 'missing',
+      secretAccessKey: secretAccessKey ? 'set' : 'missing',
+    })
+    
     if (!bucketEndpoint || !bucketName || !accessKeyId || !secretAccessKey) {
       return NextResponse.json(
-        { error: 'Bucket storage not configured. Please set BUCKET_* environment variables.' },
+        { 
+          error: 'Bucket storage not configured',
+          missing: {
+            BUCKET_ENDPOINT: !bucketEndpoint,
+            BUCKET_NAME: !bucketName,
+            BUCKET_ACCESS_KEY_ID: !accessKeyId,
+            BUCKET_SECRET_ACCESS_KEY: !secretAccessKey,
+          }
+        },
         { status: 500 }
       )
     }
     
-    // Create S3 client
+    // Create S3 client for Tigris
     const s3Client = new S3Client({
       endpoint: bucketEndpoint,
       region: 'auto',
       credentials: { accessKeyId, secretAccessKey },
-      forcePathStyle: true,
+      forcePathStyle: false, // Tigris uses virtual-hosted style
     })
     
     // Generate unique filename
     const timestamp = Date.now()
     const extension = file.name.split('.').pop() || (type === 'voice' ? 'mp3' : 'png')
     const key = `avatars/${type}s/${timestamp}-${Math.random().toString(36).substring(7)}.${extension}`
+    
+    console.log(`📤 Uploading ${type} to bucket: ${bucketName}/${key}`)
     
     // Upload to bucket
     const buffer = Buffer.from(await file.arrayBuffer())
@@ -64,10 +100,12 @@ export async function POST(request: NextRequest) {
       Key: key,
       Body: buffer,
       ContentType: file.type,
+      ACL: 'public-read', // Make file publicly accessible
     }))
     
-    // Construct public URL
-    const publicUrl = `${bucketEndpoint}/${bucketName}/${key}`
+    // Construct public URL for Tigris
+    // Format: https://{bucket-name}.fly.storage.tigris.dev/{key}
+    const publicUrl = `https://${bucketName}.fly.storage.tigris.dev/${key}`
     
     console.log(`✅ Uploaded avatar ${type}: ${publicUrl}`)
     

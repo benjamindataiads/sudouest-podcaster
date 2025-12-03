@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+export const dynamic = 'force-dynamic'
 import { db, videoJobs } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 import { generateVideo } from '@/lib/services/fal'

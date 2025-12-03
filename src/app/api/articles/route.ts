@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { fetchTodayArticles } from '@/lib/services/scraper'
 import { analyzeAndSelectArticles } from '@/lib/services/ai'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * GET /api/articles
  * Récupère les articles du jour et les analyse

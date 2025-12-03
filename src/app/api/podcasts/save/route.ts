@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+export const dynamic = 'force-dynamic'
 import { db, podcasts, type NewPodcast } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+export const dynamic = 'force-dynamic'
 import { generateVideo, generateCaptions } from '@/lib/services/fal'
 import { addOverlaysToVideo } from '@/lib/services/video-processor'
 import { db, videoFiles, podcasts, audioFiles } from '@/lib/db'

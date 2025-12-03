@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+export const dynamic = 'force-dynamic'
 import { generateAudio } from '@/lib/services/fal'
 import { db, audioFiles, podcasts } from '@/lib/db'
 import { eq } from 'drizzle-orm'

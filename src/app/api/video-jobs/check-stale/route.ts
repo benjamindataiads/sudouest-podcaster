@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { db, videoJobs } from '@/lib/db'
 import { sql } from 'drizzle-orm'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * GET /api/video-jobs/check-stale
  * Vérifie et réinitialise les jobs bloqués en "generating" depuis trop longtemps

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+export const dynamic = 'force-dynamic'
 import { concatenateVideos } from '@/lib/services/video-processor'
 import { addOverlaysToVideo } from '@/lib/services/video-processor'
 import path from 'path'

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+export const dynamic = 'force-dynamic'
 import { analyzeAndSelectArticles, AnalysisType } from '@/lib/services/ai'
 import { ScrapedArticle } from '@/types'
 

@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { db, podcasts } from '@/lib/db'
 import { desc } from 'drizzle-orm'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * GET /api/podcasts/latest
  * Récupère les derniers podcasts

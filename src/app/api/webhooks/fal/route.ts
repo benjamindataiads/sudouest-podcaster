@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db, audioJobs, videoJobs } from '@/lib/db'
 import { eq, sql } from 'drizzle-orm'
+import { uploadAudioToBucket, uploadVideoToBucket, isBucketConfigured } from '@/lib/services/storage'
 
 export const dynamic = 'force-dynamic'
 
@@ -78,20 +79,34 @@ async function handleVideoJobCallback(
   console.log(`🎬 Processing video job callback: ${job.id}`)
   
   if (status === 'OK' && payload?.video?.url) {
+    let finalVideoUrl = payload.video.url
+    
+    // Upload to bucket if configured (permanent storage)
+    if (isBucketConfigured()) {
+      try {
+        console.log(`📤 Uploading video to bucket...`)
+        finalVideoUrl = await uploadVideoToBucket(payload.video.url, job.id)
+        console.log(`✅ Video uploaded to bucket: ${finalVideoUrl}`)
+      } catch (uploadError) {
+        console.error(`⚠️ Bucket upload failed, using fal.ai URL:`, uploadError)
+        // Continue with fal.ai URL if bucket upload fails
+      }
+    }
+    
     // Success - update job with video URL
     await db
       .update(videoJobs)
       .set({
         status: 'completed',
-        videoUrl: payload.video.url,
+        videoUrl: finalVideoUrl,
         completedAt: new Date(),
         updatedAt: new Date(),
       })
       .where(eq(videoJobs.id, job.id))
     
-    console.log(`✅ Video job ${job.id} completed: ${payload.video.url}`)
+    console.log(`✅ Video job ${job.id} completed: ${finalVideoUrl}`)
     
-    return NextResponse.json({ success: true, jobId: job.id, type: 'video' })
+    return NextResponse.json({ success: true, jobId: job.id, type: 'video', videoUrl: finalVideoUrl })
   } else {
     // Error - update job with error
     const errorMessage = error || payload_error || 'Unknown error from fal.ai'
@@ -155,9 +170,23 @@ async function handleAudioChunkCallback(
   const scriptChunk = scriptChunks[chunkIndex]
   
   if (status === 'OK' && payload?.audio?.url) {
+    let audioUrl = payload.audio.url
+    
+    // Upload to bucket if configured (permanent storage)
+    if (isBucketConfigured()) {
+      try {
+        console.log(`📤 Uploading audio chunk ${chunkIndex} to bucket...`)
+        audioUrl = await uploadAudioToBucket(payload.audio.url, job.id, chunkIndex)
+        console.log(`✅ Audio chunk uploaded: ${audioUrl}`)
+      } catch (uploadError) {
+        console.error(`⚠️ Bucket upload failed, using fal.ai URL:`, uploadError)
+        // Continue with fal.ai URL if bucket upload fails
+      }
+    }
+    
     // Add this chunk to the completed chunks
     const newChunk = {
-      url: payload.audio.url,
+      url: audioUrl,
       chunkIndex: chunkIndex,
       text: scriptChunk?.text || '',
       section: scriptChunk?.section,

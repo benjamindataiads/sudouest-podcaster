@@ -103,9 +103,9 @@ export async function POST(request: NextRequest) {
       ACL: 'public-read', // Make file publicly accessible
     }))
     
-    // Construct public URL for Tigris
-    // Format: https://{bucket-name}.fly.storage.tigris.dev/{key}
-    const publicUrl = `https://${bucketName}.fly.storage.tigris.dev/${key}`
+    // Construct public URL for Railway storage
+    // Format: https://{bucket-name}.storage.railway.app/{key}
+    const publicUrl = `https://${bucketName}.storage.railway.app/${key}`
     
     console.log(`✅ Uploaded avatar ${type}: ${publicUrl}`)
     

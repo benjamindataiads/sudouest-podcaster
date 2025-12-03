@@ -73,9 +73,9 @@ export async function uploadFromUrl(
   
   await client.send(command)
   
-  // Construct the public URL
-  const endpoint = process.env.BUCKET_ENDPOINT!
-  const publicUrl = `${endpoint}/${bucketName}/${destinationKey}`
+  // Construct the public URL for Railway storage
+  // Format: https://{bucket-name}.storage.railway.app/{key}
+  const publicUrl = `https://${bucketName}.storage.railway.app/${destinationKey}`
   
   console.log(`✅ Uploaded to bucket: ${publicUrl}`)
   

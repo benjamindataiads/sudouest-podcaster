@@ -131,10 +131,38 @@ export async function GET() {
     `)
     console.log('✅ categories table created/verified')
 
+    // Create avatars table
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS avatars (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        voice_url TEXT NOT NULL,
+        image_url TEXT NOT NULL,
+        is_default BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT NOW() NOT NULL,
+        updated_at TIMESTAMP DEFAULT NOW() NOT NULL
+      )
+    `)
+    console.log('✅ avatars table created/verified')
+
+    // Add avatar_id column to podcasts if it doesn't exist
+    await db.execute(sql`
+      DO $$ 
+      BEGIN 
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'podcasts' AND column_name = 'avatar_id'
+        ) THEN 
+          ALTER TABLE podcasts ADD COLUMN avatar_id INTEGER;
+        END IF;
+      END $$;
+    `)
+    console.log('✅ podcasts.avatar_id column added/verified')
+
     return NextResponse.json({
       success: true,
       message: 'All database tables created/verified successfully',
-      tables: ['articles', 'podcasts', 'audio_files', 'video_files', 'audio_jobs', 'video_jobs', 'categories']
+      tables: ['articles', 'podcasts', 'audio_files', 'video_files', 'audio_jobs', 'video_jobs', 'categories', 'avatars']
     })
   } catch (error) {
     console.error('❌ Migration error:', error)

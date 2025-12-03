@@ -77,12 +77,13 @@ export async function POST(request: NextRequest) {
       )
     }
     
-    // Create S3 client for Tigris
+    // Create S3 client for Railway storage
+    console.log(`🔧 Creating S3 client with endpoint: ${bucketEndpoint}`)
     const s3Client = new S3Client({
       endpoint: bucketEndpoint,
-      region: 'auto',
+      region: 'us-east-1', // Railway uses us-east-1
       credentials: { accessKeyId, secretAccessKey },
-      forcePathStyle: false, // Tigris uses virtual-hosted style
+      forcePathStyle: true, // Try path-style first
     })
     
     // Generate unique filename
@@ -95,13 +96,17 @@ export async function POST(request: NextRequest) {
     // Upload to bucket
     const buffer = Buffer.from(await file.arrayBuffer())
     
-    await s3Client.send(new PutObjectCommand({
-      Bucket: bucketName,
-      Key: key,
-      Body: buffer,
-      ContentType: file.type,
-      ACL: 'public-read', // Make file publicly accessible
-    }))
+    try {
+      await s3Client.send(new PutObjectCommand({
+        Bucket: bucketName,
+        Key: key,
+        Body: buffer,
+        ContentType: file.type,
+      }))
+    } catch (s3Error) {
+      console.error('S3 upload error:', s3Error)
+      throw s3Error
+    }
     
     // Construct public URL for Railway storage
     // Format: https://{bucket-name}.storage.railway.app/{key}

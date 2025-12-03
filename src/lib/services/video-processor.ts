@@ -255,8 +255,8 @@ export async function concatenateVideos(videoUrls: string[]): Promise<string> {
         
         // Nettoyer les fichiers temporaires
         try {
-          for (const localPath of localPaths) {
-            await fs.unlink(localPath)
+          for (const normalizedPath of normalizedPaths) {
+            await fs.unlink(normalizedPath)
           }
           await fs.unlink(listPath)
           console.log('Temporary files cleaned up')

@@ -6,6 +6,18 @@ import { uploadAudioToBucket, uploadVideoToBucket, isBucketConfigured } from '@/
 export const dynamic = 'force-dynamic'
 
 /**
+ * GET /api/webhooks/fal
+ * Health check endpoint to verify webhook is accessible
+ */
+export async function GET() {
+  return NextResponse.json({
+    status: 'ok',
+    message: 'Fal.ai webhook endpoint is ready',
+    timestamp: new Date().toISOString(),
+  })
+}
+
+/**
  * POST /api/webhooks/fal
  * Receives callbacks from fal.ai when jobs are completed
  * 

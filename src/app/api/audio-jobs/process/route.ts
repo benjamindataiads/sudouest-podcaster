@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 export const dynamic = 'force-dynamic'
-import { db, audioJobs } from '@/lib/db'
+import { db, audioJobs, podcasts, avatars } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 import { submitAudioWithWebhooks } from '@/lib/services/fal'
 import { ScriptChunk } from '@/types'
@@ -47,11 +47,34 @@ export async function POST() {
       }, { status: 400 })
     }
 
+    // Get avatar voice URL from podcast
+    let voiceUrl: string | undefined
+    if (queuedJob.podcastId) {
+      const [podcast] = await db
+        .select()
+        .from(podcasts)
+        .where(eq(podcasts.id, queuedJob.podcastId))
+        .limit(1)
+      
+      if (podcast?.avatarId) {
+        const [avatar] = await db
+          .select()
+          .from(avatars)
+          .where(eq(avatars.id, podcast.avatarId))
+          .limit(1)
+        
+        if (avatar) {
+          voiceUrl = avatar.voiceUrl
+          console.log(`🎤 Using avatar voice: ${avatar.name} (${voiceUrl})`)
+        }
+      }
+    }
+
     try {
       // 2. Submit to fal.ai with webhooks (non-blocking)
       console.log(`📤 Submitting ${scriptChunks.length} audio chunks with webhooks...`)
       
-      const { requestIds, webhookUrl } = await submitAudioWithWebhooks(scriptChunks)
+      const { requestIds, webhookUrl } = await submitAudioWithWebhooks(scriptChunks, voiceUrl)
 
       console.log(`✅ All ${requestIds.length} chunks submitted to fal.ai`)
       console.log(`📥 Webhook URL: ${webhookUrl}`)

@@ -74,6 +74,7 @@ export const AVAILABLE_AVATARS: AvatarOption[] = [
 interface GenerateAudioOptions {
   text?: string
   voiceId: string
+  voiceUrl?: string // Custom voice reference URL (from avatar)
   scriptChunks?: ScriptChunk[] // Passer directement les chunks du script
   onProgress?: (percent: number, message: string) => void // Callback pour la progression
 }
@@ -184,19 +185,25 @@ async function mergeMultipleAudioFiles(chunks: AudioChunk[], batchIndex: number)
   return chunks[0].url
 }
 
+// Default avatar URLs
+const DEFAULT_VOICE_URL = 'https://dataiads-test1.fr/sudouest/voix.mp3'
+const DEFAULT_IMAGE_URL = 'https://dataiads-test1.fr/sudouest/avatarsudsouest.png'
+
 /**
  * Submit audio chunks to fal.ai with webhook callback (no polling)
  * Returns the request_ids - results will come via webhook
  */
 export async function submitAudioWithWebhooks(
-  scriptChunks: ScriptChunk[]
+  scriptChunks: ScriptChunk[],
+  voiceUrl?: string
 ): Promise<{ requestIds: string[], webhookUrl: string }> {
   ensureFalConfigured()
   
-  const REFERENCE_AUDIO_URL = 'https://dataiads-test1.fr/sudouest/voix.mp3'
+  const referenceAudioUrl = voiceUrl || DEFAULT_VOICE_URL
   const webhookUrl = getWebhookUrl()
   
   console.log(`🚀 Submitting ${scriptChunks.length} audio chunks with webhook: ${webhookUrl}`)
+  console.log(`🎤 Using voice: ${referenceAudioUrl}`)
   
   // Submit ALL chunks in parallel with webhook
   const submitPromises = scriptChunks.map(async (scriptChunk, i) => {
@@ -210,7 +217,7 @@ export async function submitAudioWithWebhooks(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        audio_url: REFERENCE_AUDIO_URL,
+        audio_url: referenceAudioUrl,
         text: scriptChunk.text,
         model: 'speech-02-hd',
         noise_reduction: true,
@@ -235,18 +242,20 @@ export async function submitAudioWithWebhooks(
 
 /**
  * Génère un fichier audio à partir des chunks de script
- * Utilise Minimax Voice Clone avec l'URL de référence Sud-Ouest
+ * Utilise Minimax Voice Clone avec l'URL de référence (avatar ou défaut)
  * NOTE: This uses polling. For production, use submitAudioWithWebhooks instead.
  */
 export async function generateAudio({
   text,
   voiceId,
+  voiceUrl,
   scriptChunks,
   onProgress,
 }: GenerateAudioOptions): Promise<GenerateAudioResult> {
   ensureFalConfigured()
   try {
-    const REFERENCE_AUDIO_URL = 'https://dataiads-test1.fr/sudouest/voix.mp3'
+    const referenceAudioUrl = voiceUrl || DEFAULT_VOICE_URL
+    console.log(`🎤 Using voice reference: ${referenceAudioUrl}`)
     
     // Si des chunks de script sont fournis, les utiliser directement
     if (scriptChunks && scriptChunks.length > 0) {
@@ -262,7 +271,7 @@ export async function generateAudio({
         console.log(`Submitting chunk ${i + 1}/${scriptChunks.length} (${scriptChunk.text.length} chars)`)
         const { request_id } = await fal.queue.submit('fal-ai/minimax/voice-clone', {
           input: {
-            audio_url: REFERENCE_AUDIO_URL,
+            audio_url: referenceAudioUrl,
             text: scriptChunk.text,
             model: 'speech-02-hd',
             noise_reduction: true,
@@ -376,7 +385,7 @@ export async function generateAudio({
     
     const result = await fal.subscribe('fal-ai/minimax/voice-clone', {
       input: {
-        audio_url: REFERENCE_AUDIO_URL,
+        audio_url: referenceAudioUrl,
         text: text.substring(0, 300), // Limiter à 300 chars
         model: 'speech-02-hd',
         noise_reduction: true,
@@ -426,7 +435,7 @@ export async function submitVideoWithWebhook(
   ensureFalConfigured()
   
   const webhookUrl = getWebhookUrl()
-  const imageUrl = avatarImageUrl || 'https://dataiads-test1.fr/sudouest/avatarsudsouest.png'
+  const imageUrl = avatarImageUrl || DEFAULT_IMAGE_URL
   
   console.log(`🎬 Submitting video generation with webhook: ${webhookUrl}`)
   console.log(`  Audio URL: ${audioUrl}`)

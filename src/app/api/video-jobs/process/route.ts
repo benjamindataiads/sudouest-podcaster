@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 export const dynamic = 'force-dynamic'
-import { db, videoJobs } from '@/lib/db'
+import { db, videoJobs, podcasts, avatars } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 import { submitVideoWithWebhook } from '@/lib/services/fal'
 
@@ -27,13 +27,36 @@ export async function POST() {
 
     console.log(`🎬 Processing video job: ${jobToProcess.id}`)
 
+    // Get avatar image URL from podcast
+    let avatarImageUrl: string | undefined
+    if (jobToProcess.podcastId) {
+      const [podcast] = await db
+        .select()
+        .from(podcasts)
+        .where(eq(podcasts.id, jobToProcess.podcastId))
+        .limit(1)
+      
+      if (podcast?.avatarId) {
+        const [avatar] = await db
+          .select()
+          .from(avatars)
+          .where(eq(avatars.id, podcast.avatarId))
+          .limit(1)
+        
+        if (avatar) {
+          avatarImageUrl = avatar.imageUrl
+          console.log(`🎭 Using avatar image: ${avatar.name} (${avatarImageUrl})`)
+        }
+      }
+    }
+
     try {
       // 2. Submit to fal.ai with webhook (non-blocking)
       console.log(`📤 Submitting video to fal.ai with webhook...`)
       
       const { requestId, webhookUrl } = await submitVideoWithWebhook(
         jobToProcess.audioUrl,
-        'https://dataiads-test1.fr/sudouest/avatarsudsouest.png'
+        avatarImageUrl
       )
 
       console.log(`✅ Video submitted to fal.ai`)

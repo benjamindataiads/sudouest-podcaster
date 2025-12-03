@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import SudOuestLogo from '@/components/ui/SudOuestLogo'
 import CreatePodcastDialog from '@/components/features/CreatePodcastDialog'
-import { Play, Film, Loader2, Plus, Clock, Calendar, Edit2, ChevronDown, ChevronUp, Trash2 } from 'lucide-react'
+import { Play, Film, Loader2, Plus, Clock, Calendar, Edit2, ChevronDown, ChevronUp, Trash2, User } from 'lucide-react'
 
 interface Podcast {
   id: number
@@ -109,12 +109,20 @@ export default function HomePage() {
               <div className="hidden md:block h-8 w-px bg-white/30" />
               <h1 className="text-2xl md:text-3xl font-bold">Podcaster</h1>
             </div>
-            <Link href="/gallery">
-              <Button variant="outline" className="bg-white text-[#D42E1B] hover:bg-gray-100 border-0">
-                <Film className="h-4 w-4 mr-2" />
-                Galerie
-              </Button>
-            </Link>
+            <div className="flex items-center gap-3">
+              <Link href="/avatars">
+                <Button variant="outline" className="bg-white/10 text-white hover:bg-white/20 border-white/30">
+                  <User className="h-4 w-4 mr-2" />
+                  Avatars
+                </Button>
+              </Link>
+              <Link href="/gallery">
+                <Button variant="outline" className="bg-white text-[#D42E1B] hover:bg-gray-100 border-0">
+                  <Film className="h-4 w-4 mr-2" />
+                  Galerie
+                </Button>
+              </Link>
+            </div>
           </div>
         </div>
       </div>

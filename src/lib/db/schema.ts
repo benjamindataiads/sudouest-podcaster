@@ -34,6 +34,7 @@ export const podcasts = pgTable('podcasts', {
   date: timestamp('date').defaultNow().notNull(),
   status: varchar('status', { length: 50 }).notNull().default('draft'), // draft, articles_selected, script_ready, audio_generated, video_generating, video_generated, completed
   currentStep: integer('current_step').default(1), // 1: articles, 2: script, 3: audio, 4: video
+  avatarId: integer('avatar_id'), // ID de l'avatar sélectionné pour ce podcast
   selectedArticles: jsonb('selected_articles').$type<Array<{
     id: number
     title: string
@@ -162,6 +163,19 @@ export const categories = pgTable('categories', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 })
 
+/**
+ * Table pour stocker les avatars (personnages pour les podcasts)
+ */
+export const avatars = pgTable('avatars', {
+  id: serial('id').primaryKey(),
+  name: varchar('name', { length: 100 }).notNull(),
+  voiceUrl: text('voice_url').notNull(), // URL du fichier MP3 de référence pour le clonage vocal
+  imageUrl: text('image_url').notNull(), // URL de l'image de l'avatar
+  isDefault: boolean('is_default').default(false), // Avatar par défaut (Benoit Lasserre)
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+})
+
 export type Article = typeof articles.$inferSelect
 export type NewArticle = typeof articles.$inferInsert
 export type Podcast = typeof podcasts.$inferSelect
@@ -176,4 +190,6 @@ export type AudioJob = typeof audioJobs.$inferSelect
 export type NewAudioJob = typeof audioJobs.$inferInsert
 export type VideoJob = typeof videoJobs.$inferSelect
 export type NewVideoJob = typeof videoJobs.$inferInsert
+export type Avatar = typeof avatars.$inferSelect
+export type NewAvatar = typeof avatars.$inferInsert
 

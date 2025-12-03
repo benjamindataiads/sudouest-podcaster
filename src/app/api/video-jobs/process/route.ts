@@ -2,25 +2,20 @@ import { NextResponse } from 'next/server'
 export const dynamic = 'force-dynamic'
 import { db, videoJobs } from '@/lib/db'
 import { eq } from 'drizzle-orm'
-import { generateVideo } from '@/lib/services/fal'
-import { addOverlaysToVideo } from '@/lib/services/video-processor'
-import path from 'path'
+import { submitVideoWithWebhook } from '@/lib/services/fal'
 
 /**
  * POST /api/video-jobs/process
- * Traite un job vidéo spécifique (appelé en boucle par le client)
+ * Submits video job to fal.ai with webhooks (no polling)
+ * Results will come via /api/webhooks/fal
  */
 export async function POST() {
   try {
-    const { sql } = await import('drizzle-orm')
-    
-    // 1. Chercher un job en attente (queued) OU completed avec URL fal.ai non traitée
+    // 1. Chercher un job en attente (queued)
     const [jobToProcess] = await db
       .select()
       .from(videoJobs)
-      .where(
-        sql`${videoJobs.status} = 'queued' OR (${videoJobs.status} = 'completed' AND ${videoJobs.videoUrl} LIKE 'https://v3b.fal.media%')`
-      )
+      .where(eq(videoJobs.status, 'queued'))
       .limit(1)
 
     if (!jobToProcess) {
@@ -30,69 +25,32 @@ export async function POST() {
       })
     }
 
-    const needsFFmpegProcessing = jobToProcess.videoUrl?.startsWith('https://v3b.fal.media')
-    console.log(`🎬 Processing job: ${jobToProcess.id} (needsFFmpeg: ${needsFFmpegProcessing})`)
-
-    // 2. Marquer comme "generating" si pas déjà en processing
-    if (jobToProcess.status !== 'generating') {
-      await db
-        .update(videoJobs)
-        .set({ 
-          status: 'generating',
-          updatedAt: new Date() 
-        })
-        .where(eq(videoJobs.id, jobToProcess.id))
-    }
+    console.log(`🎬 Processing video job: ${jobToProcess.id}`)
 
     try {
-      // 3. Obtenir l'URL de la vidéo brute
-      let rawVideoUrl: string
+      // 2. Submit to fal.ai with webhook (non-blocking)
+      console.log(`📤 Submitting video to fal.ai with webhook...`)
       
-      if (needsFFmpegProcessing) {
-        console.log(`✅ Job already has video URL from fal.ai: ${jobToProcess.videoUrl}`)
-        rawVideoUrl = jobToProcess.videoUrl!
-      } else {
-        // Générer nouvelle vidéo via fal.ai
-        console.log(`🎬 Generating new video with fal.ai...`)
-        const videoResult = await generateVideo({
-          audioUrl: jobToProcess.audioUrl,
-          avatarId: 'sudouest-default',
-          avatarImageUrl: 'https://dataiads-test1.fr/sudouest/avatarsudsouest.png',
-        })
-        rawVideoUrl = videoResult.videoUrl
-        
-        // Sauvegarder le request_id immédiatement
-        await db
-          .update(videoJobs)
-          .set({
-            falRequestId: videoResult.requestId,
-            updatedAt: new Date(),
-          })
-          .where(eq(videoJobs.id, jobToProcess.id))
-        
-        console.log(`✅ Video generated with request_id: ${videoResult.requestId}`)
-        console.log(`Video URL: ${rawVideoUrl}`)
-      }
+      const { requestId, webhookUrl } = await submitVideoWithWebhook(
+        jobToProcess.audioUrl,
+        'https://dataiads-test1.fr/sudouest/avatarsudsouest.png'
+      )
 
+      console.log(`✅ Video submitted to fal.ai`)
+      console.log(`  Request ID: ${requestId}`)
+      console.log(`  Webhook URL: ${webhookUrl}`)
 
-      // 4. Pour l'instant, utiliser directement l'URL de fal.ai (sans overlay)
-      // Les overlays seront ajoutés uniquement dans la vidéo finale assemblée
-      const publicUrl = rawVideoUrl
-
-      // 6. Mettre à jour le job comme completed avec URL locale
+      // 3. Update job with request ID and mark as generating
       await db
         .update(videoJobs)
         .set({
-          status: 'completed',
-          videoUrl: publicUrl,
-          completedAt: new Date(),
+          status: 'generating',
+          falRequestId: requestId,
           updatedAt: new Date(),
         })
         .where(eq(videoJobs.id, jobToProcess.id))
 
-      console.log(`✅ Job ${jobToProcess.id} completed successfully with local URL: ${publicUrl}`)
-
-      // Vérifier s'il y a d'autres jobs en attente
+      // 4. Check for more queued jobs
       const remainingJobs = await db
         .select()
         .from(videoJobs)
@@ -102,14 +60,15 @@ export async function POST() {
       return NextResponse.json({
         success: true,
         jobId: jobToProcess.id,
-        videoUrl: publicUrl,
+        message: 'Video submitted, waiting for webhook callback',
+        requestId,
+        webhookUrl,
         hasMore: remainingJobs.length > 0,
       })
 
     } catch (error) {
       console.error(`❌ Job ${jobToProcess.id} failed:`, error)
       
-      // Marquer comme failed
       await db
         .update(videoJobs)
         .set({
@@ -124,7 +83,7 @@ export async function POST() {
         success: false,
         jobId: jobToProcess.id,
         error: error instanceof Error ? error.message : String(error),
-        hasMore: true, // Continuer avec les autres jobs
+        hasMore: true,
       }, { status: 500 })
     }
 

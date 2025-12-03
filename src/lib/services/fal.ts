@@ -13,6 +13,18 @@ function ensureFalConfigured() {
 }
 
 /**
+ * Get the webhook URL for fal.ai callbacks
+ */
+function getWebhookUrl(): string {
+  const baseUrl = process.env.RAILWAY_PUBLIC_DOMAIN 
+    ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+    : process.env.NEXT_PUBLIC_BASE_URL 
+    || 'http://localhost:3001'
+  
+  return `${baseUrl}/api/webhooks/fal`
+}
+
+/**
  * Liste des voix disponibles pour la génération audio
  * Utilise Minimax Voice Clone avec l'audio de référence Sud-Ouest
  */
@@ -152,9 +164,58 @@ async function mergeMultipleAudioFiles(chunks: AudioChunk[], batchIndex: number)
 }
 
 /**
+ * Submit audio chunks to fal.ai with webhook callback (no polling)
+ * Returns the request_ids - results will come via webhook
+ */
+export async function submitAudioWithWebhooks(
+  scriptChunks: ScriptChunk[]
+): Promise<{ requestIds: string[], webhookUrl: string }> {
+  ensureFalConfigured()
+  
+  const REFERENCE_AUDIO_URL = 'https://dataiads-test1.fr/sudouest/voix.mp3'
+  const webhookUrl = getWebhookUrl()
+  
+  console.log(`🚀 Submitting ${scriptChunks.length} audio chunks with webhook: ${webhookUrl}`)
+  
+  // Submit ALL chunks in parallel with webhook
+  const submitPromises = scriptChunks.map(async (scriptChunk, i) => {
+    console.log(`Submitting chunk ${i + 1}/${scriptChunks.length} (${scriptChunk.text.length} chars)`)
+    
+    // Use fetch to submit with webhook query param (SDK doesn't support webhook param directly)
+    const response = await fetch(`https://queue.fal.run/fal-ai/minimax/voice-clone?fal_webhook=${encodeURIComponent(webhookUrl)}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Key ${process.env.FAL_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        audio_url: REFERENCE_AUDIO_URL,
+        text: scriptChunk.text,
+        model: 'speech-02-hd',
+        noise_reduction: true,
+        need_volume_normalization: true,
+      }),
+    })
+    
+    if (!response.ok) {
+      throw new Error(`Failed to submit chunk ${i + 1}: ${response.status}`)
+    }
+    
+    const { request_id } = await response.json()
+    console.log(`✅ Chunk ${i + 1} submitted: ${request_id}`)
+    return request_id
+  })
+  
+  const requestIds = await Promise.all(submitPromises)
+  console.log(`📤 All ${requestIds.length} chunks submitted with webhooks!`)
+  
+  return { requestIds, webhookUrl }
+}
+
+/**
  * Génère un fichier audio à partir des chunks de script
  * Utilise Minimax Voice Clone avec l'URL de référence Sud-Ouest
- * Les chunks générés seront directement utilisables (pas de merge ici)
+ * NOTE: This uses polling. For production, use submitAudioWithWebhooks instead.
  */
 export async function generateAudio({
   text,
@@ -168,7 +229,7 @@ export async function generateAudio({
     
     // Si des chunks de script sont fournis, les utiliser directement
     if (scriptChunks && scriptChunks.length > 0) {
-      console.log(`🚀 Generating ${scriptChunks.length} audio chunks IN PARALLEL using Minimax Voice Clone`)
+      console.log(`🚀 Generating ${scriptChunks.length} audio chunks IN PARALLEL using Minimax Voice Clone (polling mode)`)
       
       if (onProgress) {
         onProgress(10, `Soumission de ${scriptChunks.length} chunks audio en parallèle...`)
@@ -334,8 +395,60 @@ interface GenerateVideoResult {
 }
 
 /**
+ * Submit a video generation job to fal.ai with webhook callback (no polling)
+ * Returns the request_id - result will come via webhook
+ */
+export async function submitVideoWithWebhook(
+  audioUrl: string,
+  avatarImageUrl?: string
+): Promise<{ requestId: string, webhookUrl: string }> {
+  ensureFalConfigured()
+  
+  const webhookUrl = getWebhookUrl()
+  const imageUrl = avatarImageUrl || 'https://dataiads-test1.fr/sudouest/avatarsudsouest.png'
+  
+  console.log(`🎬 Submitting video generation with webhook: ${webhookUrl}`)
+  console.log(`  Audio URL: ${audioUrl}`)
+  console.log(`  Avatar image URL: ${imageUrl}`)
+  
+  // Validate URLs
+  if (!audioUrl || !audioUrl.startsWith('http')) {
+    throw new Error(`Invalid audio URL: ${audioUrl}`)
+  }
+  
+  if (!imageUrl || !imageUrl.startsWith('http')) {
+    throw new Error(`Invalid image URL: ${imageUrl}`)
+  }
+  
+  // Submit with webhook
+  const response = await fetch(`https://queue.fal.run/fal-ai/kling-video/v1/standard/ai-avatar?fal_webhook=${encodeURIComponent(webhookUrl)}`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Key ${process.env.FAL_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      image_url: imageUrl,
+      audio_url: audioUrl,
+      prompt: '.',
+    }),
+  })
+  
+  if (!response.ok) {
+    const errorText = await response.text()
+    throw new Error(`Failed to submit video: ${response.status} - ${errorText}`)
+  }
+  
+  const { request_id } = await response.json()
+  console.log(`✅ Video submitted with webhook: ${request_id}`)
+  
+  return { requestId: request_id, webhookUrl }
+}
+
+/**
  * Génère une vidéo avec AI Avatar et lip-sync à partir d'un audio
  * Utilise Kling AI Avatar avec l'avatar Sud-Ouest hébergé publiquement
+ * NOTE: This uses polling. For production, use submitVideoWithWebhook instead.
  */
 export async function generateVideo({
   audioUrl,

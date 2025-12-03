@@ -2,11 +2,13 @@ import { NextResponse } from 'next/server'
 export const dynamic = 'force-dynamic'
 import { db, audioJobs } from '@/lib/db'
 import { eq } from 'drizzle-orm'
-import { generateAudio } from '@/lib/services/fal'
+import { submitAudioWithWebhooks } from '@/lib/services/fal'
+import { ScriptChunk } from '@/types'
 
 /**
  * POST /api/audio-jobs/process
- * Traite un job audio en attente (worker backend)
+ * Submits audio job to fal.ai with webhooks (no polling)
+ * Results will come via /api/webhooks/fal
  */
 export async function POST() {
   try {
@@ -26,55 +28,45 @@ export async function POST() {
 
     console.log(`🎤 Processing audio job: ${queuedJob.id}`)
 
-    // 2. Marquer comme "generating"
-    await db
-      .update(audioJobs)
-      .set({ 
-        status: 'generating',
-        updatedAt: new Date() 
-      })
-      .where(eq(audioJobs.id, queuedJob.id))
-
-    try {
-      // 3. Générer l'audio avec fal.ai
-      console.log(`Generating audio with ${queuedJob.scriptChunks?.length || 0} chunks`)
-      
-      const audioResult = await generateAudio({
-        scriptChunks: queuedJob.scriptChunks || [],
-        voiceId: queuedJob.voiceId,
-      })
-
-      console.log(`✅ Audio generated: ${audioResult.audioChunks?.length || 1} chunks`)
-
-      // 4. Mettre à jour le job
+    const scriptChunks = (queuedJob.scriptChunks || []) as ScriptChunk[]
+    
+    if (scriptChunks.length === 0) {
       await db
         .update(audioJobs)
         .set({
-          status: 'completed',
-          audioChunks: audioResult.audioChunks || null,
-          audioUrl: audioResult.audioUrl || null,
-          completedAt: new Date(),
+          status: 'failed',
+          error: 'No script chunks provided',
+          updatedAt: new Date(),
+        })
+        .where(eq(audioJobs.id, queuedJob.id))
+      
+      return NextResponse.json({
+        success: false,
+        jobId: queuedJob.id,
+        error: 'No script chunks provided',
+      }, { status: 400 })
+    }
+
+    try {
+      // 2. Submit to fal.ai with webhooks (non-blocking)
+      console.log(`📤 Submitting ${scriptChunks.length} audio chunks with webhooks...`)
+      
+      const { requestIds, webhookUrl } = await submitAudioWithWebhooks(scriptChunks)
+
+      console.log(`✅ All ${requestIds.length} chunks submitted to fal.ai`)
+      console.log(`📥 Webhook URL: ${webhookUrl}`)
+
+      // 3. Update job with request IDs and mark as generating
+      await db
+        .update(audioJobs)
+        .set({
+          status: 'generating',
+          falRequestIds: requestIds,
           updatedAt: new Date(),
         })
         .where(eq(audioJobs.id, queuedJob.id))
 
-      // 5. Mettre à jour le podcast
-      if (queuedJob.podcastId && audioResult.audioChunks) {
-        const { podcasts } = await import('@/lib/db')
-        await db
-          .update(podcasts)
-          .set({
-            audioChunks: audioResult.audioChunks,
-            status: 'audio_generated',
-            currentStep: 4,
-            updatedAt: new Date(),
-          })
-          .where(eq(podcasts.id, queuedJob.podcastId))
-        
-        console.log(`✅ Podcast ${queuedJob.podcastId} updated with audio chunks`)
-      }
-
-      // Vérifier s'il reste des jobs
+      // 4. Check for more jobs
       const remainingJobs = await db
         .select()
         .from(audioJobs)
@@ -84,14 +76,15 @@ export async function POST() {
       return NextResponse.json({
         success: true,
         jobId: queuedJob.id,
-        audioChunks: audioResult.audioChunks,
+        message: `Submitted ${requestIds.length} audio chunks, waiting for webhook callbacks`,
+        requestIds,
+        webhookUrl,
         hasMore: remainingJobs.length > 0,
       })
 
     } catch (error) {
       console.error(`❌ Audio job ${queuedJob.id} failed:`, error)
       
-      // Marquer comme failed
       await db
         .update(audioJobs)
         .set({

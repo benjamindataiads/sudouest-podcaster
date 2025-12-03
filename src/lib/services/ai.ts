@@ -1,9 +1,16 @@
 import OpenAI from 'openai'
 import { ScrapedArticle, PodcastScript, ArticleWithScore, ScriptChunk } from '@/types'
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
+let openaiInstance: OpenAI | null = null
+
+function getOpenAI(): OpenAI {
+  if (!openaiInstance) {
+    openaiInstance = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    })
+  }
+  return openaiInstance
+}
 
 export type AnalysisType = 'general' | 'fun' | 'faits-divers' | 'politique' | 'sport'
 
@@ -220,7 +227,7 @@ export async function analyzeAndSelectArticles(
   const prompt = buildPromptForAnalysisType(articles, analysisType)
 
   try {
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAI().chat.completions.create({
       model: 'gpt-4-turbo-preview',
       messages: [
         {
@@ -334,7 +341,7 @@ Réponds avec un JSON au format suivant :
 RAPPEL : Phrases courtes (< 250 caractères chacune) !`
 
   try {
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAI().chat.completions.create({
       model: 'gpt-4-turbo-preview',
       messages: [
         {

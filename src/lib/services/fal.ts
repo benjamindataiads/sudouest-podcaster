@@ -1,10 +1,16 @@
 import * as fal from '@fal-ai/serverless-client'
 import { VoiceOption, AvatarOption, ScriptChunk } from '@/types'
 
-// Configure fal.ai
-fal.config({
-  credentials: process.env.FAL_KEY,
-})
+let falConfigured = false
+
+function ensureFalConfigured() {
+  if (!falConfigured) {
+    fal.config({
+      credentials: process.env.FAL_KEY,
+    })
+    falConfigured = true
+  }
+}
 
 /**
  * Liste des voix disponibles pour la génération audio
@@ -156,6 +162,7 @@ export async function generateAudio({
   scriptChunks,
   onProgress,
 }: GenerateAudioOptions): Promise<GenerateAudioResult> {
+  ensureFalConfigured()
   try {
     const REFERENCE_AUDIO_URL = 'https://dataiads-test1.fr/sudouest/voix.mp3'
     
@@ -277,6 +284,7 @@ export async function generateVideo({
   avatarId,
   avatarImageUrl,
 }: GenerateVideoOptions): Promise<GenerateVideoResult> {
+  ensureFalConfigured()
   const maxRetries = 3
   let lastError: Error | null = null
 
@@ -376,6 +384,7 @@ function getAvatarImageUrl(avatarId: string): string {
  * Génère des sous-titres pour une vidéo
  */
 export async function generateCaptions(audioUrl: string): Promise<string> {
+  ensureFalConfigured()
   try {
     // Utiliser Whisper pour la transcription
     const result = await fal.subscribe('fal-ai/whisper', {

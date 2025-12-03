@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useVideoGeneration } from '@/contexts/VideoGenerationContext'
@@ -20,7 +20,7 @@ interface SelectedVideo {
   order: number
 }
 
-export default function GalleryPage() {
+function GalleryPageContent() {
   const searchParams = useSearchParams()
   const podcastId = searchParams.get('podcastId') ? parseInt(searchParams.get('podcastId')!) : null
   
@@ -706,3 +706,14 @@ export default function GalleryPage() {
   )
 }
 
+export default function GalleryPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Loader2 className="h-12 w-12 animate-spin text-[#D42E1B]" />
+      </div>
+    }>
+      <GalleryPageContent />
+    </Suspense>
+  )
+}

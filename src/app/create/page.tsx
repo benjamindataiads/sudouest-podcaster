@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -16,7 +16,7 @@ import { ArticleWithScore, PodcastScript } from '@/types'
 import { AudioChunk } from '@/lib/services/fal'
 import { Loader2, FileText, Video, Newspaper, CheckCircle2, Home, Mic, Film } from 'lucide-react'
 
-export default function CreatePodcastPage() {
+function CreatePodcastPageContent() {
   const searchParams = useSearchParams()
   const resumeId = searchParams.get('resume')
 
@@ -402,4 +402,17 @@ export default function CreatePodcastPage() {
   )
 }
 
-
+export default function CreatePodcastPage() {
+  return (
+    <Suspense fallback={
+      <main className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin text-[#D42E1B] mx-auto mb-4" />
+          <p className="text-gray-600">Chargement...</p>
+        </div>
+      </main>
+    }>
+      <CreatePodcastPageContent />
+    </Suspense>
+  )
+}

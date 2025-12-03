@@ -154,11 +154,12 @@ async function handleAudioChunkCallback(
   console.log(`🎤 Processing audio chunk callback for job: ${job.id}, request: ${requestId}`)
   
   // Get current audio chunks (or initialize empty array)
+  type SectionType = 'introduction' | 'article' | 'conclusion'
   const currentChunks = (job.audioChunks || []) as Array<{
     url: string
     chunkIndex: number
     text: string
-    section?: string
+    section?: SectionType
     articleTitle?: string
     requestId?: string
   }>
@@ -176,7 +177,7 @@ async function handleAudioChunkCallback(
   const scriptChunks = (job.scriptChunks || []) as Array<{
     text: string
     index: number
-    section: string
+    section: SectionType
     articleTitle?: string
   }>
   const scriptChunk = scriptChunks[chunkIndex]
@@ -197,7 +198,7 @@ async function handleAudioChunkCallback(
     }
     
     // Add this chunk to the completed chunks
-    const newChunk = {
+    const newChunk: typeof currentChunks[number] = {
       url: audioUrl,
       chunkIndex: chunkIndex,
       text: scriptChunk?.text || '',

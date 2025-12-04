@@ -269,12 +269,13 @@ export default function StepFour({
       return
     }
 
-    // Créer tous les jobs (status: queued)
+    // Créer tous les jobs (status: queued) avec l'image choisie pour chaque segment
     // Le worker de la galerie va les traiter via /api/video-jobs/process (webhooks)
     console.log(`📝 Creating ${realAudioChunks.length} video jobs...`)
     
     await Promise.all(realAudioChunks.map(async (chunk, i) => {
-      await addJob(chunk.url, i, chunk.text, chunk.section, podcastId || undefined)
+      const selectedImage = getImageForChunk(i)
+      await addJob(chunk.url, i, chunk.text, chunk.section, podcastId || undefined, selectedImage)
     }))
 
     console.log(`✅ Created ${realAudioChunks.length} video jobs in database`)

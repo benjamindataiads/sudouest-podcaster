@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 export const dynamic = 'force-dynamic'
 import { generateVideo, generateCaptions } from '@/lib/services/fal'
 import { addOverlaysToVideo } from '@/lib/services/video-processor'
-import { db, videoFiles, podcasts, audioFiles } from '@/lib/db'
+import { db, videoFiles, podcasts, audioFiles, avatars } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 import path from 'path'
 
@@ -18,21 +18,48 @@ export async function POST(request: NextRequest) {
       audioFileId, 
       audioUrl, 
       avatarId, 
+      avatarImageUrl: providedImageUrl,  // URL d'image fournie directement
       withCaptions = true 
     } = body
 
-    if (!audioUrl || !avatarId) {
+    if (!audioUrl) {
       return NextResponse.json(
-        { error: 'URL audio et ID avatar requis' },
+        { error: 'URL audio requis' },
         { status: 400 }
       )
     }
+
+    // Récupérer l'URL de l'image de l'avatar
+    let finalAvatarImageUrl = providedImageUrl
+    
+    // Si pas d'URL fournie mais un avatarId, chercher dans la DB
+    if (!finalAvatarImageUrl && avatarId) {
+      console.log(`🔍 Looking up avatar image for ID: ${avatarId}`)
+      
+      // Si avatarId est un nombre, chercher dans la table avatars
+      const avatarIdNum = parseInt(avatarId)
+      if (!isNaN(avatarIdNum)) {
+        const [avatar] = await db
+          .select()
+          .from(avatars)
+          .where(eq(avatars.id, avatarIdNum))
+          .limit(1)
+        
+        if (avatar) {
+          finalAvatarImageUrl = avatar.imageUrl
+          console.log(`✅ Found avatar: ${avatar.name} => ${finalAvatarImageUrl}`)
+        }
+      }
+    }
+    
+    console.log(`🎬 Final avatar image URL: ${finalAvatarImageUrl || 'will use default'}`)
 
     // 1. Générer la vidéo avec lip-sync
     console.log('Generating video with lip-sync...')
     const videoResult = await generateVideo({
       audioUrl,
       avatarId,
+      avatarImageUrl: finalAvatarImageUrl,  // Passer l'URL de l'image
     })
 
     console.log(`✅ Video generated: ${videoResult.videoUrl}`)

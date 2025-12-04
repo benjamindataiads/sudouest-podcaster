@@ -248,90 +248,19 @@ export default function StepFour({
       return
     }
 
-    // Créer tous les jobs d'abord et stocker les IDs
-    const jobIds = await Promise.all(realAudioChunks.map(async (chunk, i) => {
-      const jobId = await addJob(chunk.url, i, chunk.text, chunk.section, podcastId || undefined)
-      await updateJobStatus(jobId, 'queued')
-      return { index: i, jobId }
+    // Créer tous les jobs (status: queued)
+    // Le worker de la galerie va les traiter via /api/video-jobs/process (webhooks)
+    console.log(`📝 Creating ${realAudioChunks.length} video jobs...`)
+    
+    await Promise.all(realAudioChunks.map(async (chunk, i) => {
+      await addJob(chunk.url, i, chunk.text, chunk.section, podcastId || undefined)
     }))
 
-    // Rediriger immédiatement vers la galerie avec le podcastId
+    console.log(`✅ Created ${realAudioChunks.length} video jobs in database`)
+
+    // Rediriger vers la galerie - le worker va traiter les jobs automatiquement
     const galleryUrl = podcastId ? `/gallery?podcastId=${podcastId}` : '/gallery'
     router.push(galleryUrl)
-
-    // Cas 1 : Plusieurs chunks audio → générer TOUTES les vidéos EN PARALLÈLE
-    if (hasMultipleChunks) {
-      console.log(`🚀 Launching ${jobIds.length} video generations in PARALLEL...`)
-      
-      // Lancer TOUTES les générations en parallèle avec Promise.allSettled
-      const videoPromises = jobIds.map(async ({ index: i, jobId }) => {
-        const chunk = realAudioChunks[i]
-
-        try {
-          await updateJobStatus(jobId, 'generating')
-          console.log(`🎬 Starting video ${i + 1}/${audioChunks.length}...`)
-
-          const response = await fetch('/api/video/generate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              audioUrl: chunk.url,
-              avatarId: selectedAvatar,
-              avatarImageUrl: avatarImageUrl,
-              withCaptions: false,
-            }),
-          })
-
-          if (!response.ok) {
-            throw new Error(`Erreur lors de la génération de la vidéo ${i + 1}`)
-          }
-
-          const data = await response.json()
-          await updateJobStatus(jobId, 'completed', data.videoUrl)
-          console.log(`✅ Video ${i + 1}/${realAudioChunks.length} completed!`)
-          
-          return { success: true, index: i }
-        } catch (err) {
-          console.error(`❌ Video ${i + 1} failed:`, err)
-          await updateJobStatus(jobId, 'failed', undefined, err instanceof Error ? err.message : 'Erreur')
-          return { success: false, index: i, error: err }
-      }
-      })
-
-      // Attendre que toutes les vidéos soient terminées (ou échouées)
-      const results = await Promise.allSettled(videoPromises)
-      const successCount = results.filter(r => r.status === 'fulfilled' && r.value.success).length
-      console.log(`✅ Video generation completed: ${successCount}/${jobIds.length} succeeded`)
-    } 
-    // Cas 2 : Un seul audio → générer une seule vidéo
-    else {
-      const { jobId } = jobIds[0]
-
-      try {
-        await updateJobStatus(jobId, 'generating')
-
-        const response = await fetch('/api/video/generate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            audioUrl,
-            avatarId: selectedAvatar,
-            avatarImageUrl: avatarImageUrl,
-            withCaptions,
-          }),
-        })
-
-        if (!response.ok) {
-          throw new Error('Erreur lors de la génération de la vidéo')
-        }
-
-        const data = await response.json()
-        await updateJobStatus(jobId, 'completed', data.videoUrl)
-      } catch (err) {
-        console.error(err)
-        await updateJobStatus(jobId, 'failed', undefined, err instanceof Error ? err.message : 'Erreur')
-      }
-    }
   }
 
   if (loading) {

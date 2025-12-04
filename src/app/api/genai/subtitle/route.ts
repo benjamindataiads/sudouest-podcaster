@@ -6,11 +6,6 @@ export const maxDuration = 300 // 5 minutes for subtitle generation
 
 const AUTO_SUBTITLE_MODEL = 'fal-ai/workflow-utilities/auto-subtitle'
 
-// Available options for the UI
-export const FONT_COLORS = ['white', 'black', 'red', 'green', 'blue', 'yellow', 'orange', 'purple', 'pink', 'brown', 'gray', 'cyan', 'magenta'] as const
-export const POSITIONS = ['top', 'center', 'bottom'] as const
-export const FONT_WEIGHTS = ['normal', 'bold', 'black'] as const
-
 interface SubtitleInput {
   video_url: string
   language: string

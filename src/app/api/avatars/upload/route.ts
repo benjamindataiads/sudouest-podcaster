@@ -102,10 +102,22 @@ export async function POST(request: NextRequest) {
         Key: key,
         Body: buffer,
         ContentType: file.type,
+        ACL: 'public-read', // Make file publicly accessible
       }))
     } catch (s3Error) {
       console.error('S3 upload error:', s3Error)
-      throw s3Error
+      // If ACL fails, try without it
+      if (String(s3Error).includes('ACL')) {
+        console.log('Retrying without ACL...')
+        await s3Client.send(new PutObjectCommand({
+          Bucket: bucketName,
+          Key: key,
+          Body: buffer,
+          ContentType: file.type,
+        }))
+      } else {
+        throw s3Error
+      }
     }
     
     // Construct public URL for Railway storage

@@ -159,6 +159,12 @@ export async function GET() {
     `)
     console.log('✅ podcasts.avatar_id column added/verified')
 
+    // Change voice_id from VARCHAR(100) to TEXT to support full URLs
+    await db.execute(sql`
+      ALTER TABLE audio_jobs ALTER COLUMN voice_id TYPE TEXT;
+    `)
+    console.log('✅ audio_jobs.voice_id changed to TEXT')
+
     return NextResponse.json({
       success: true,
       message: 'All database tables created/verified successfully',

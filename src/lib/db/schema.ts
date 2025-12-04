@@ -115,7 +115,7 @@ export const audioJobs = pgTable('audio_jobs', {
     section: 'introduction' | 'article' | 'conclusion'
     articleTitle?: string
   }>>(),
-  voiceId: varchar('voice_id', { length: 100 }).notNull(),
+  voiceId: text('voice_id').notNull(), // Changed to text to support full URLs
   status: varchar('status', { length: 50 }).notNull().default('queued'), // queued, generating, completed, failed
   audioUrl: text('audio_url'),
   audioChunks: jsonb('audio_chunks').$type<Array<{

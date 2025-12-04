@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, Suspense, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useVideoGeneration } from '@/contexts/VideoGenerationContext'
@@ -32,6 +32,9 @@ function GalleryPageContent() {
   const [includeIntro, setIncludeIntro] = useState(false)
   const [includeOutro, setIncludeOutro] = useState(false)
   const [podcast, setPodcast] = useState<{selectedArticles?: Array<Record<string, unknown>>, script?: Record<string, unknown>, audioChunks?: Array<Record<string, unknown>>, finalVideoUrl?: string} | null>(null)
+  
+  // Ref to prevent multiple workers from running simultaneously
+  const workerRunningRef = useRef(false)
 
   // Charger le podcast pour afficher la navigation
   useEffect(() => {
@@ -92,7 +95,9 @@ function GalleryPageContent() {
   useEffect(() => {
     const queuedJobs = jobs.filter(j => j.status === 'queued')
     
-    if (queuedJobs.length > 0) {
+    // Prevent multiple workers from running simultaneously
+    if (queuedJobs.length > 0 && !workerRunningRef.current) {
+      workerRunningRef.current = true
       console.log(`🔧 Found ${queuedJobs.length} queued jobs, starting worker...`)
       
       // Fonction récursive pour traiter les jobs un par un
@@ -105,7 +110,7 @@ function GalleryPageContent() {
           const data = await response.json()
           
           if (data.success) {
-            console.log(`✅ Job ${data.jobId} completed`)
+            console.log(`✅ Job ${data.jobId} submitted to fal.ai`)
             // Rafraîchir pour afficher le résultat
             await refreshJobs(podcastId || undefined)
             
@@ -113,11 +118,20 @@ function GalleryPageContent() {
             if (data.hasMore) {
               console.log('➡️ Processing next job...')
               setTimeout(processNextJob, 1000) // Petite pause entre chaque job
+            } else {
+              console.log('✅ All jobs submitted to fal.ai')
+              workerRunningRef.current = false
             }
           } else if (data.hasMore) {
             // Job a échoué mais il y en a d'autres, continuer
             console.log('⚠️ Job failed, trying next one...')
             setTimeout(processNextJob, 2000)
+          } else if (data.message === 'No jobs to process') {
+            // No more jobs to process
+            console.log('✅ No more jobs to process')
+            workerRunningRef.current = false
+          } else {
+            workerRunningRef.current = false
           }
         } catch (error) {
           console.error('Worker error:', error)

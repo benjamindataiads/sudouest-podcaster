@@ -9,6 +9,7 @@ import { Loader2 } from 'lucide-react'
 
 interface StepOneProps {
   onComplete: (articles: ArticleWithScore[]) => void
+  onSkipToCustomScript?: () => void
 }
 
 const RSS_FEEDS = [
@@ -17,7 +18,7 @@ const RSS_FEEDS = [
   { value: 'rugby', label: 'Rugby - Bordeaux-Bègles', url: 'https://www.sudouest.fr/sport/rugby/bordeaux-begles/rss.xml' },
 ]
 
-export default function StepOne({ onComplete }: StepOneProps) {
+export default function StepOne({ onComplete, onSkipToCustomScript }: StepOneProps) {
   const [articles, setArticles] = useState<ArticleWithScore[]>([])
   const [loading, setLoading] = useState(true)
   const [analyzing, setAnalyzing] = useState(false)
@@ -135,6 +136,23 @@ export default function StepOne({ onComplete }: StepOneProps) {
 
   return (
     <div className="space-y-6">
+      {/* Option to skip articles and write custom script */}
+      {onSkipToCustomScript && (
+        <Card className="border-dashed border-2 border-gray-300 bg-gray-50">
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-medium text-gray-900">Vous souhaitez écrire votre propre script ?</h3>
+                <p className="text-sm text-gray-500">Sautez la sélection d&apos;articles et rédigez directement votre contenu</p>
+              </div>
+              <Button variant="outline" onClick={onSkipToCustomScript}>
+                Écrire un script personnalisé
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <div>

@@ -511,8 +511,8 @@ function CreatePodcastPageContent() {
 
             {/* Étape 2 : Script */}
             <button
-              onClick={() => selectedArticles.length > 0 && setCurrentStep('2')}
-              disabled={selectedArticles.length === 0}
+              onClick={() => (selectedArticles.length > 0 || script) && setCurrentStep('2')}
+              disabled={selectedArticles.length === 0 && !script}
               className={`
                 flex-1 px-6 py-4 flex items-center justify-center gap-3 transition-all border-r border-gray-200
                 ${currentStep === '2' 
@@ -602,7 +602,14 @@ function CreatePodcastPageContent() {
           </TabsList>
 
           <TabsContent value="1">
-            <StepOne onComplete={handleStep1Complete} />
+            <StepOne 
+              onComplete={handleStep1Complete} 
+              onSkipToCustomScript={() => {
+                // Skip to step 2 with empty articles for custom script mode
+                setSelectedArticles([])
+                setCurrentStep('2')
+              }}
+            />
           </TabsContent>
 
           <TabsContent value="2">

@@ -34,11 +34,28 @@ export default function StepTwo({ selectedArticles, existingScript, onComplete, 
     }
   }, [existingScript])
 
-  // Générer automatiquement SEULEMENT si aucun script n'existe
+  // Générer automatiquement SEULEMENT si aucun script n'existe ET qu'il y a des articles
   useEffect(() => {
     if (selectedArticles.length > 0 && !script && !existingScript) {
       console.log('🔄 No existing script, generating new one...')
       generateScript()
+    } else if (selectedArticles.length === 0 && !script && !existingScript) {
+      // Mode script personnalisé - créer un script vide
+      console.log('📝 Custom script mode - creating empty script')
+      setScript({
+        introduction: '',
+        articles: [],
+        conclusion: '',
+        estimatedDuration: 0,
+        chunks: [],
+      })
+      setEditing(true)
+      setEditingChunks(true)
+      setEditedChunks([{
+        text: '',
+        index: 0,
+        section: 'article',
+      }])
     }
   }, [selectedArticles, existingScript])
 

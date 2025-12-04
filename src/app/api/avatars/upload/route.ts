@@ -120,16 +120,22 @@ export async function POST(request: NextRequest) {
       }
     }
     
-    // Use proxy URL to serve files with proper CORS
-    // Format: /api/files/{key}
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || ''
-    const publicUrl = `${baseUrl}/api/files/${key}`
+    // Use direct bucket URL for fal.ai to access
+    // Format: https://{bucket}.{endpoint-host}/{key}
+    const endpointUrl = new URL(bucketEndpoint)
+    const directUrl = `https://${bucketName}.${endpointUrl.host}/${key}`
     
-    console.log(`✅ Uploaded avatar ${type}: ${publicUrl}`)
+    // Also provide proxy URL for frontend display with CORS
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || ''
+    const proxyUrl = `${baseUrl}/api/files/${key}`
+    
+    console.log(`✅ Uploaded avatar ${type}: ${directUrl}`)
+    console.log(`   Proxy URL: ${proxyUrl}`)
     
     return NextResponse.json({
       success: true,
-      url: publicUrl,
+      url: directUrl, // Direct URL for fal.ai to access
+      proxyUrl,       // Proxy URL for frontend display
       type,
       filename: file.name,
     })

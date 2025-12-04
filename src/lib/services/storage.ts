@@ -45,13 +45,33 @@ function getBucketName(): string {
 }
 
 /**
+ * Get the direct public URL for the bucket (for external services like fal.ai)
+ * Railway storage format: https://{bucket}.{endpoint-host}/{key}
+ */
+export function getDirectBucketUrl(key: string): string {
+  const endpoint = process.env.ENDPOINT || process.env.BUCKET_ENDPOINT || ''
+  const bucketName = getBucketName()
+  
+  // Parse the endpoint to get the host
+  // e.g., https://storage.railway.app -> storage.railway.app
+  const endpointUrl = new URL(endpoint)
+  const directUrl = `https://${bucketName}.${endpointUrl.host}/${key}`
+  
+  return directUrl
+}
+
+/**
  * Upload a file from a URL to the bucket
  * Downloads the file and uploads it to S3-compatible storage
+ * 
+ * @param useDirectUrl - If true, returns direct bucket URL (for external services like fal.ai)
+ *                       If false, returns proxy URL (for frontend with CORS)
  */
 export async function uploadFromUrl(
   sourceUrl: string,
   destinationKey: string,
-  contentType?: string
+  contentType?: string,
+  useDirectUrl: boolean = false
 ): Promise<string> {
   console.log(`📥 Downloading from: ${sourceUrl}`)
   
@@ -77,9 +97,14 @@ export async function uploadFromUrl(
   
   await client.send(command)
   
-  // Use proxy URL to serve files with proper CORS
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || ''
-  const publicUrl = `${baseUrl}/api/files/${destinationKey}`
+  // Return direct bucket URL (for external services) or proxy URL (for frontend)
+  let publicUrl: string
+  if (useDirectUrl) {
+    publicUrl = getDirectBucketUrl(destinationKey)
+  } else {
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || ''
+    publicUrl = `${baseUrl}/api/files/${destinationKey}`
+  }
   
   console.log(`✅ Uploaded to bucket: ${publicUrl}`)
   
@@ -88,6 +113,7 @@ export async function uploadFromUrl(
 
 /**
  * Upload audio file from fal.ai to bucket
+ * Returns direct bucket URL (used by fal.ai for video generation)
  */
 export async function uploadAudioToBucket(
   falUrl: string,
@@ -95,7 +121,8 @@ export async function uploadAudioToBucket(
   chunkIndex: number
 ): Promise<string> {
   const key = `audio/${jobId}/chunk-${chunkIndex}.mp3`
-  return uploadFromUrl(falUrl, key, 'audio/mpeg')
+  // Use direct URL since this audio will be used by fal.ai for video generation
+  return uploadFromUrl(falUrl, key, 'audio/mpeg', true)
 }
 
 /**

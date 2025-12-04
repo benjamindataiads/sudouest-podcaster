@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import SudOuestLogo from '@/components/ui/SudOuestLogo'
-import { Plus, Film, Loader2, Play, Pause, Trash2, Edit2, User, Home, Wand2, Upload, Sparkles, ImageIcon, Mic, Square, Volume2, Camera, Video } from 'lucide-react'
+import { Plus, Film, Loader2, Play, Pause, Trash2, Edit2, User, Home, Wand2, Upload, Sparkles, ImageIcon, Mic, Square, Volume2, Camera, Video, Grid3X3, Maximize2, Check, Eye } from 'lucide-react'
 
 interface Avatar {
   id: number
@@ -318,6 +318,10 @@ function AvatarModal({
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
+  
+  // Preview state for generated images
+  const [previewMode, setPreviewMode] = useState<'grid' | 'preview'>('grid')
+  const [previewImageIndex, setPreviewImageIndex] = useState(0)
 
   const isEditing = !!avatar
   
@@ -477,18 +481,32 @@ De Bordeaux à Biarritz, en passant par Pau et Arcachon, nous allons explorer en
   const startWebcam = async () => {
     try {
       setError(null)
+      setShowWebcam(true) // Show the UI first
+      setWebcamReady(false)
+      
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: { width: 1280, height: 720, facingMode: 'user' } 
       })
       streamRef.current = stream
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
-        videoRef.current.onloadedmetadata = () => {
-          setWebcamReady(true)
+      
+      // Wait a tick for the video element to be in the DOM
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream
+          videoRef.current.onloadedmetadata = () => {
+            videoRef.current?.play().then(() => {
+              setWebcamReady(true)
+            }).catch((playErr) => {
+              console.error('Video play error:', playErr)
+              setWebcamReady(true) // Still set ready, autoplay might work
+            })
+          }
+          // Also try to play directly in case onloadedmetadata already fired
+          videoRef.current.play().catch(() => {})
         }
-      }
-      setShowWebcam(true)
+      }, 100)
     } catch (err) {
+      setShowWebcam(false)
       setError('Impossible d\'accéder à la webcam: ' + (err instanceof Error ? err.message : String(err)))
     }
   }
@@ -702,7 +720,7 @@ De Bordeaux à Biarritz, en passant par Pau et Arcachon, nous allons explorer en
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-4xl max-h-[95vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold text-gray-900">
             {isEditing ? 'Modifier l\'avatar' : 'Nouvel avatar'}
@@ -1129,29 +1147,146 @@ De Bordeaux à Biarritz, en passant par Pau et Arcachon, nous allons explorer en
 
                 {/* Generated Images */}
                 {aiGeneratedImages.length > 0 && (
-                  <div className="space-y-2">
-                    <Label>Résultats - Cliquez pour sélectionner</Label>
-                    <div className="grid grid-cols-2 gap-3">
-                      {aiGeneratedImages.map((img, idx) => (
+                  <div className="space-y-3 mt-4 p-4 bg-white rounded-lg border border-purple-200">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-purple-900 font-semibold">Résultats ({aiGeneratedImages.length} images)</Label>
+                      <div className="flex gap-1 bg-purple-100 rounded-lg p-1">
                         <button
-                          key={idx}
                           type="button"
-                          onClick={() => selectAiImage(img.url)}
-                          className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all hover:scale-105 ${
-                            imageUrl === img.url ? 'border-[#D42E1B] ring-2 ring-[#D42E1B]' : 'border-gray-200 hover:border-purple-400'
+                          onClick={() => setPreviewMode('grid')}
+                          className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1.5 ${
+                            previewMode === 'grid' ? 'bg-white text-purple-700 shadow-sm' : 'text-purple-600 hover:text-purple-800'
                           }`}
                         >
-                          <img src={img.url} alt={`Généré ${idx + 1}`} className="w-full h-full object-cover" />
-                          {imageUrl === img.url && (
-                            <div className="absolute inset-0 bg-[#D42E1B]/20 flex items-center justify-center">
-                              <span className="bg-[#D42E1B] text-white px-2 py-1 rounded text-xs font-medium">
-                                ✓ Sélectionné
-                              </span>
-                            </div>
-                          )}
+                          <Grid3X3 className="h-4 w-4" />
+                          Grille
                         </button>
-                      ))}
+                        <button
+                          type="button"
+                          onClick={() => setPreviewMode('preview')}
+                          className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1.5 ${
+                            previewMode === 'preview' ? 'bg-white text-purple-700 shadow-sm' : 'text-purple-600 hover:text-purple-800'
+                          }`}
+                        >
+                          <Eye className="h-4 w-4" />
+                          Aperçu
+                        </button>
+                      </div>
                     </div>
+                    
+                    {/* Grid Mode */}
+                    {previewMode === 'grid' && (
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        {aiGeneratedImages.map((img, idx) => (
+                          <div key={idx} className="space-y-2">
+                            <button
+                              type="button"
+                              onClick={() => selectAiImage(img.url)}
+                              className={`relative w-full aspect-square rounded-lg overflow-hidden border-2 transition-all hover:scale-[1.02] ${
+                                imageUrl === img.url ? 'border-[#D42E1B] ring-2 ring-[#D42E1B]' : 'border-gray-200 hover:border-purple-400'
+                              }`}
+                            >
+                              <img src={img.url} alt={`Généré ${idx + 1}`} className="w-full h-full object-cover" />
+                              {imageUrl === img.url && (
+                                <div className="absolute top-2 right-2">
+                                  <div className="bg-[#D42E1B] text-white p-1 rounded-full">
+                                    <Check className="h-4 w-4" />
+                                  </div>
+                                </div>
+                              )}
+                            </button>
+                            <div className="flex gap-1">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant={imageUrl === img.url ? "default" : "outline"}
+                                onClick={() => selectAiImage(img.url)}
+                                className={`flex-1 text-xs ${imageUrl === img.url ? 'bg-[#D42E1B] hover:bg-[#B01030]' : ''}`}
+                              >
+                                {imageUrl === img.url ? '✓ Sélectionné' : 'Sélectionner'}
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => {
+                                  setPreviewImageIndex(idx)
+                                  setPreviewMode('preview')
+                                }}
+                                className="px-2"
+                              >
+                                <Maximize2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {/* Preview Mode - Full Size */}
+                    {previewMode === 'preview' && (
+                      <div className="space-y-4">
+                        {/* Image thumbnails selector */}
+                        <div className="flex gap-2 justify-center">
+                          {aiGeneratedImages.map((img, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => setPreviewImageIndex(idx)}
+                              className={`w-16 h-16 rounded-lg overflow-hidden border-2 transition-all ${
+                                previewImageIndex === idx ? 'border-purple-500 ring-2 ring-purple-300' : 'border-gray-200 hover:border-purple-300'
+                              }`}
+                            >
+                              <img src={img.url} alt={`Thumb ${idx + 1}`} className="w-full h-full object-cover" />
+                            </button>
+                          ))}
+                        </div>
+                        
+                        {/* Full size preview with real aspect ratio */}
+                        <div className="flex justify-center bg-gray-100 rounded-lg p-4">
+                          <img 
+                            src={aiGeneratedImages[previewImageIndex]?.url} 
+                            alt="Aperçu pleine taille"
+                            className="max-h-[400px] w-auto rounded-lg shadow-lg"
+                            style={{ objectFit: 'contain' }}
+                          />
+                        </div>
+                        
+                        {/* Image info */}
+                        {aiGeneratedImages[previewImageIndex] && (
+                          <div className="text-center text-sm text-gray-500">
+                            {aiGeneratedImages[previewImageIndex].width && aiGeneratedImages[previewImageIndex].height && (
+                              <span>{aiGeneratedImages[previewImageIndex].width} × {aiGeneratedImages[previewImageIndex].height} px</span>
+                            )}
+                          </div>
+                        )}
+                        
+                        {/* Select button */}
+                        <div className="flex justify-center">
+                          <Button
+                            type="button"
+                            onClick={() => selectAiImage(aiGeneratedImages[previewImageIndex]?.url)}
+                            className={`px-8 ${
+                              imageUrl === aiGeneratedImages[previewImageIndex]?.url 
+                                ? 'bg-[#D42E1B] hover:bg-[#B01030]' 
+                                : 'bg-purple-600 hover:bg-purple-700'
+                            }`}
+                          >
+                            {imageUrl === aiGeneratedImages[previewImageIndex]?.url ? (
+                              <>
+                                <Check className="mr-2 h-4 w-4" />
+                                Image sélectionnée
+                              </>
+                            ) : (
+                              <>
+                                <Check className="mr-2 h-4 w-4" />
+                                Sélectionner cette image
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </TabsContent>

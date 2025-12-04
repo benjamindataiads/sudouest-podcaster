@@ -8,10 +8,10 @@ export const dynamic = 'force-dynamic'
  * Check if bucket is configured
  */
 export async function GET() {
-  const bucketEndpoint = process.env.BUCKET_ENDPOINT
-  const bucketName = process.env.BUCKET_NAME
-  const accessKeyId = process.env.BUCKET_ACCESS_KEY_ID
-  const secretAccessKey = process.env.BUCKET_SECRET_ACCESS_KEY
+  const bucketEndpoint = process.env.ENDPOINT || process.env.BUCKET_ENDPOINT
+  const bucketName = process.env.BUCKET || process.env.BUCKET_NAME
+  const accessKeyId = process.env.ACCESS_KEY_ID || process.env.BUCKET_ACCESS_KEY_ID
+  const secretAccessKey = process.env.SECRET_ACCESS_KEY || process.env.BUCKET_SECRET_ACCESS_KEY
   
   return NextResponse.json({
     configured: !!(bucketEndpoint && bucketName && accessKeyId && secretAccessKey),
@@ -49,11 +49,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Image file must be an image (PNG, JPG)' }, { status: 400 })
     }
     
-    // Check if bucket is configured
-    const bucketEndpoint = process.env.BUCKET_ENDPOINT
-    const bucketName = process.env.BUCKET_NAME
-    const accessKeyId = process.env.BUCKET_ACCESS_KEY_ID
-    const secretAccessKey = process.env.BUCKET_SECRET_ACCESS_KEY
+    // Check if bucket is configured (Railway uses ENDPOINT, BUCKET, ACCESS_KEY_ID, SECRET_ACCESS_KEY)
+    const bucketEndpoint = process.env.ENDPOINT || process.env.BUCKET_ENDPOINT
+    const bucketName = process.env.BUCKET || process.env.BUCKET_NAME
+    const accessKeyId = process.env.ACCESS_KEY_ID || process.env.BUCKET_ACCESS_KEY_ID
+    const secretAccessKey = process.env.SECRET_ACCESS_KEY || process.env.BUCKET_SECRET_ACCESS_KEY
     
     console.log('Bucket config:', {
       endpoint: bucketEndpoint ? 'set' : 'missing',
@@ -67,10 +67,10 @@ export async function POST(request: NextRequest) {
         { 
           error: 'Bucket storage not configured',
           missing: {
-            BUCKET_ENDPOINT: !bucketEndpoint,
-            BUCKET_NAME: !bucketName,
-            BUCKET_ACCESS_KEY_ID: !accessKeyId,
-            BUCKET_SECRET_ACCESS_KEY: !secretAccessKey,
+            ENDPOINT: !bucketEndpoint,
+            BUCKET: !bucketName,
+            ACCESS_KEY_ID: !accessKeyId,
+            SECRET_ACCESS_KEY: !secretAccessKey,
           }
         },
         { status: 500 }

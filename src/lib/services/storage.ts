@@ -4,15 +4,18 @@ let s3Client: S3Client | null = null
 
 /**
  * Get or create S3 client for bucket operations
+ * Supports both Railway reference names and manual names
  */
 function getS3Client(): S3Client {
   if (!s3Client) {
-    const endpoint = process.env.BUCKET_ENDPOINT
-    const accessKeyId = process.env.BUCKET_ACCESS_KEY_ID
-    const secretAccessKey = process.env.BUCKET_SECRET_ACCESS_KEY
+    // Railway uses ENDPOINT, ACCESS_KEY_ID, SECRET_ACCESS_KEY when using references
+    // Also support manual BUCKET_* names for flexibility
+    const endpoint = process.env.ENDPOINT || process.env.BUCKET_ENDPOINT
+    const accessKeyId = process.env.ACCESS_KEY_ID || process.env.BUCKET_ACCESS_KEY_ID
+    const secretAccessKey = process.env.SECRET_ACCESS_KEY || process.env.BUCKET_SECRET_ACCESS_KEY
     
     if (!endpoint || !accessKeyId || !secretAccessKey) {
-      throw new Error('Bucket configuration missing. Set BUCKET_ENDPOINT, BUCKET_ACCESS_KEY_ID, and BUCKET_SECRET_ACCESS_KEY')
+      throw new Error('Bucket configuration missing. Set ENDPOINT, ACCESS_KEY_ID, and SECRET_ACCESS_KEY (or BUCKET_* variants)')
     }
     
     s3Client = new S3Client({
@@ -31,11 +34,12 @@ function getS3Client(): S3Client {
 
 /**
  * Get the bucket name from environment
+ * Railway uses BUCKET when using references
  */
 function getBucketName(): string {
-  const bucketName = process.env.BUCKET_NAME
+  const bucketName = process.env.BUCKET || process.env.BUCKET_NAME
   if (!bucketName) {
-    throw new Error('BUCKET_NAME environment variable not set')
+    throw new Error('BUCKET environment variable not set')
   }
   return bucketName
 }
@@ -138,14 +142,15 @@ export async function uploadFinalPodcastToBucket(
 
 /**
  * Check if bucket storage is configured
+ * Supports both Railway reference names and manual names
  */
 export function isBucketConfigured(): boolean {
-  return !!(
-    process.env.BUCKET_ENDPOINT &&
-    process.env.BUCKET_ACCESS_KEY_ID &&
-    process.env.BUCKET_SECRET_ACCESS_KEY &&
-    process.env.BUCKET_NAME
-  )
+  const hasEndpoint = !!(process.env.ENDPOINT || process.env.BUCKET_ENDPOINT)
+  const hasAccessKey = !!(process.env.ACCESS_KEY_ID || process.env.BUCKET_ACCESS_KEY_ID)
+  const hasSecretKey = !!(process.env.SECRET_ACCESS_KEY || process.env.BUCKET_SECRET_ACCESS_KEY)
+  const hasBucket = !!(process.env.BUCKET || process.env.BUCKET_NAME)
+  
+  return hasEndpoint && hasAccessKey && hasSecretKey && hasBucket
 }
 
 /**

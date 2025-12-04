@@ -19,23 +19,23 @@ interface NanoBananaOutput {
 const VARIATION_PROMPTS = [
   {
     label: 'variation-1',
-    description: 'Légère rotation tête gauche',
-    prompt: 'Same person, exact same clothes, exact same background. Subtle head turn slightly to the left, natural pose. Keep all logos and text unchanged.',
+    description: 'Plan légèrement plus serré',
+    prompt: 'Same person, exact same clothes, exact same background. Slightly tighter crop, closer view. Eyes looking directly at camera. Keep all logos and text unchanged.',
   },
   {
     label: 'variation-2', 
-    description: 'Légère rotation tête droite',
-    prompt: 'Same person, exact same clothes, exact same background. Subtle head turn slightly to the right, natural pose. Keep all logos and text unchanged.',
+    description: 'Plan légèrement plus large',
+    prompt: 'Same person, exact same clothes, exact same background. Slightly wider crop, more space around subject. Eyes looking directly at camera. Keep all logos and text unchanged.',
   },
   {
     label: 'variation-3',
     description: 'Mains légèrement différentes',
-    prompt: 'Same person, exact same clothes, exact same background. Slightly different hand position, natural gesture. Keep all logos and text unchanged.',
+    prompt: 'Same person, exact same clothes, exact same background. Slightly different hand position, natural gesture. Eyes looking directly at camera. Keep all logos and text unchanged.',
   },
   {
     label: 'variation-4',
     description: 'Expression légèrement différente',
-    prompt: 'Same person, exact same clothes, exact same background. Slightly different facial expression, subtle smile variation. Keep all logos and text unchanged.',
+    prompt: 'Same person, exact same clothes, exact same background. Slightly different facial expression, subtle smile variation. Eyes looking directly at camera. Keep all logos and text unchanged.',
   },
 ]
 

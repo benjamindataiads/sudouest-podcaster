@@ -130,7 +130,7 @@ export function broadcastToPodcast(podcastId: number, event: SSEEvent): number {
   }
   
   let sent = 0
-  for (const connectionId of connectionIds) {
+  for (const connectionId of Array.from(connectionIds)) {
     if (sendToConnection(connectionId, event)) {
       sent++
     }
@@ -145,7 +145,7 @@ export function broadcastToPodcast(podcastId: number, event: SSEEvent): number {
  */
 export function broadcastToAll(event: SSEEvent): number {
   let sent = 0
-  for (const connectionId of connections.keys()) {
+  for (const connectionId of Array.from(connections.keys())) {
     if (sendToConnection(connectionId, event)) {
       sent++
     }
@@ -225,7 +225,7 @@ export function getConnectionStats(): {
 } {
   const connectionsByPodcast: Record<number, number> = {}
   
-  for (const [podcastId, connectionIds] of podcastConnections) {
+  for (const [podcastId, connectionIds] of Array.from(podcastConnections.entries())) {
     connectionsByPodcast[podcastId] = connectionIds.size
   }
   

@@ -2,7 +2,13 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import Image from 'next/image'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import SudOuestLogo from '@/components/ui/SudOuestLogo'
+import { Plus, Film, Loader2, Play, Pause, Trash2, Edit2, User, Home } from 'lucide-react'
 
 interface Avatar {
   id: number
@@ -21,7 +27,6 @@ export default function AvatarsPage() {
   const [editingAvatar, setEditingAvatar] = useState<Avatar | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  // Load avatars
   useEffect(() => {
     loadAvatars()
   }, [])
@@ -32,7 +37,7 @@ export default function AvatarsPage() {
       const data = await response.json()
       setAvatars(data.avatars || [])
     } catch (err) {
-      setError('Failed to load avatars')
+      setError('Impossible de charger les avatars')
     } finally {
       setLoading(false)
     }
@@ -40,11 +45,11 @@ export default function AvatarsPage() {
 
   const handleDelete = async (avatar: Avatar) => {
     if (avatar.isDefault) {
-      alert('Cannot delete the default avatar')
+      alert('Impossible de supprimer l\'avatar par défaut')
       return
     }
     
-    if (!confirm(`Are you sure you want to delete "${avatar.name}"?`)) {
+    if (!confirm(`Êtes-vous sûr de vouloir supprimer "${avatar.name}" ?`)) {
       return
     }
     
@@ -54,46 +59,87 @@ export default function AvatarsPage() {
         loadAvatars()
       } else {
         const data = await response.json()
-        alert(data.error || 'Failed to delete avatar')
+        alert(data.error || 'Erreur lors de la suppression')
       }
     } catch (err) {
-      alert('Failed to delete avatar')
+      alert('Erreur lors de la suppression')
     }
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-      {/* Header */}
-      <header className="border-b border-slate-700/50 bg-slate-900/80 backdrop-blur-sm sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link href="/" className="text-slate-400 hover:text-white transition-colors">
-              ← Retour
-            </Link>
-            <h1 className="text-2xl font-bold text-white">Avatars</h1>
+    <main className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
+      {/* Header avec logo Sud-Ouest */}
+      <div className="bg-[#D42E1B] text-white">
+        <div className="container mx-auto px-4 py-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <SudOuestLogo width={120} height={40} fill="white" />
+              <div className="hidden md:block h-8 w-px bg-white/30" />
+              <h1 className="text-2xl md:text-3xl font-bold">Avatars</h1>
+            </div>
+            <div className="flex items-center gap-3">
+              <Link href="/">
+                <Button variant="outline" className="bg-white/10 text-white hover:bg-white/20 border-white/30">
+                  <Home className="h-4 w-4 mr-2" />
+                  Accueil
+                </Button>
+              </Link>
+              <Link href="/gallery">
+                <Button variant="outline" className="bg-white text-[#D42E1B] hover:bg-gray-100 border-0">
+                  <Film className="h-4 w-4 mr-2" />
+                  Galerie
+                </Button>
+              </Link>
+            </div>
           </div>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            Nouvel Avatar
-          </button>
         </div>
-      </header>
+      </div>
 
-      {/* Main content */}
-      <main className="max-w-7xl mx-auto px-6 py-8">
+      <div className="container mx-auto px-4 py-12">
+        {/* Title and Add Button */}
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h2 className="text-3xl font-bold text-gray-900">Gérer les avatars</h2>
+            <p className="text-gray-600 mt-2">
+              Créez et gérez les personnages pour vos podcasts
+            </p>
+          </div>
+          <Button 
+            onClick={() => setShowCreateModal(true)}
+            className="bg-[#D42E1B] hover:bg-[#B01030] text-white"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Nouvel Avatar
+          </Button>
+        </div>
+
+        {/* Content */}
         {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+          <div className="flex justify-center items-center py-20">
+            <Loader2 className="h-12 w-12 animate-spin text-[#D42E1B]" />
           </div>
         ) : error ? (
-          <div className="text-center py-20 text-red-400">{error}</div>
+          <div className="text-center py-20">
+            <p className="text-red-600">{error}</p>
+            <Button onClick={loadAvatars} className="mt-4">
+              Réessayer
+            </Button>
+          </div>
+        ) : avatars.length === 0 ? (
+          <div className="text-center py-20">
+            <User className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">Aucun avatar</h3>
+            <p className="text-gray-600 mb-6">Créez votre premier avatar pour commencer</p>
+            <Button 
+              onClick={() => setShowCreateModal(true)}
+              className="bg-[#D42E1B] hover:bg-[#B01030]"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Créer un avatar
+            </Button>
+          </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {avatars.map((avatar) => (
               <AvatarCard
                 key={avatar.id}
@@ -104,24 +150,23 @@ export default function AvatarsPage() {
             ))}
           </div>
         )}
-      </main>
+      </div>
 
       {/* Create/Edit Modal */}
-      {(showCreateModal || editingAvatar) && (
-        <AvatarModal
-          avatar={editingAvatar}
-          onClose={() => {
-            setShowCreateModal(false)
-            setEditingAvatar(null)
-          }}
-          onSave={() => {
-            loadAvatars()
-            setShowCreateModal(false)
-            setEditingAvatar(null)
-          }}
-        />
-      )}
-    </div>
+      <AvatarModal
+        open={showCreateModal || !!editingAvatar}
+        avatar={editingAvatar}
+        onClose={() => {
+          setShowCreateModal(false)
+          setEditingAvatar(null)
+        }}
+        onSave={() => {
+          loadAvatars()
+          setShowCreateModal(false)
+          setEditingAvatar(null)
+        }}
+      />
+    </main>
   )
 }
 
@@ -137,7 +182,7 @@ function AvatarCard({
   const [isPlaying, setIsPlaying] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
-  const playVoice = () => {
+  const togglePlay = () => {
     if (audioRef.current) {
       if (isPlaying) {
         audioRef.current.pause()
@@ -151,42 +196,47 @@ function AvatarCard({
   }
 
   return (
-    <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl overflow-hidden hover:border-slate-600/50 transition-all group">
+    <Card className="overflow-hidden hover:shadow-lg transition-shadow">
       {/* Avatar Image */}
-      <div className="relative aspect-square bg-slate-700/30">
+      <div className="relative aspect-square bg-gray-100">
         <img
           src={avatar.imageUrl}
           alt={avatar.name}
           className="w-full h-full object-cover"
+          onError={(e) => {
+            (e.target as HTMLImageElement).src = 'https://via.placeholder.com/400x400?text=Avatar'
+          }}
         />
         {avatar.isDefault && (
-          <div className="absolute top-3 left-3 px-2 py-1 bg-blue-600 text-white text-xs font-medium rounded">
+          <div className="absolute top-3 left-3 px-2 py-1 bg-[#D42E1B] text-white text-xs font-medium rounded">
             Par défaut
           </div>
         )}
       </div>
 
-      {/* Info */}
-      <div className="p-4">
-        <h3 className="text-lg font-semibold text-white mb-3">{avatar.name}</h3>
+      <CardContent className="p-4">
+        <h3 className="text-lg font-semibold text-gray-900 mb-3">{avatar.name}</h3>
 
         {/* Voice Preview */}
-        <div className="flex items-center gap-2 mb-4">
-          <button
-            onClick={playVoice}
-            className="flex items-center gap-2 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm text-slate-300 transition-colors"
+        <div className="mb-4">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={togglePlay}
+            className="w-full"
           >
             {isPlaying ? (
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
-              </svg>
+              <>
+                <Pause className="h-4 w-4 mr-2" />
+                Stop
+              </>
             ) : (
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M8 5v14l11-7z" />
-              </svg>
+              <>
+                <Play className="h-4 w-4 mr-2" />
+                Écouter la voix
+              </>
             )}
-            <span>{isPlaying ? 'Stop' : 'Écouter la voix'}</span>
-          </button>
+          </Button>
           <audio
             ref={audioRef}
             src={avatar.voiceUrl}
@@ -196,43 +246,60 @@ function AvatarCard({
 
         {/* Actions */}
         <div className="flex gap-2">
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             onClick={onEdit}
-            className="flex-1 px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm text-white transition-colors"
+            className="flex-1"
           >
+            <Edit2 className="h-4 w-4 mr-2" />
             Modifier
-          </button>
+          </Button>
           {!avatar.isDefault && (
-            <button
+            <Button
+              variant="outline"
+              size="sm"
               onClick={onDelete}
-              className="px-3 py-2 bg-red-600/20 hover:bg-red-600/30 border border-red-500/30 rounded-lg text-sm text-red-400 transition-colors"
+              className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
             >
-              Supprimer
-            </button>
+              <Trash2 className="h-4 w-4" />
+            </Button>
           )}
         </div>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   )
 }
 
 function AvatarModal({
+  open,
   avatar,
   onClose,
   onSave,
 }: {
+  open: boolean
   avatar: Avatar | null
   onClose: () => void
   onSave: () => void
 }) {
-  const [name, setName] = useState(avatar?.name || '')
-  const [voiceUrl, setVoiceUrl] = useState(avatar?.voiceUrl || '')
-  const [imageUrl, setImageUrl] = useState(avatar?.imageUrl || '')
+  const [name, setName] = useState('')
+  const [voiceUrl, setVoiceUrl] = useState('')
+  const [imageUrl, setImageUrl] = useState('')
   const [uploading, setUploading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const isEditing = !!avatar
+
+  // Reset form when modal opens
+  useEffect(() => {
+    if (open) {
+      setName(avatar?.name || '')
+      setVoiceUrl(avatar?.voiceUrl || '')
+      setImageUrl(avatar?.imageUrl || '')
+      setError(null)
+    }
+  }, [open, avatar])
 
   const handleFileUpload = async (file: File, type: 'voice' | 'image') => {
     setUploading(true)
@@ -251,7 +318,7 @@ function AvatarModal({
       const data = await response.json()
       
       if (!response.ok) {
-        throw new Error(data.error || 'Upload failed')
+        throw new Error(data.error || 'Échec de l\'upload')
       }
       
       if (type === 'voice') {
@@ -260,7 +327,7 @@ function AvatarModal({
         setImageUrl(data.url)
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Upload failed')
+      setError(err instanceof Error ? err.message : 'Échec de l\'upload')
     } finally {
       setUploading(false)
     }
@@ -270,7 +337,7 @@ function AvatarModal({
     e.preventDefault()
     
     if (!name.trim() || !voiceUrl || !imageUrl) {
-      setError('Please fill in all fields')
+      setError('Veuillez remplir tous les champs')
       return
     }
     
@@ -284,75 +351,66 @@ function AvatarModal({
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, voiceUrl, imageUrl }),
+        body: JSON.stringify({ name: name.trim(), voiceUrl: voiceUrl.trim(), imageUrl: imageUrl.trim() }),
       })
       
       const data = await response.json()
       
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to save avatar')
+        throw new Error(data.error || 'Erreur lors de la sauvegarde')
       }
       
       onSave()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save avatar')
+      setError(err instanceof Error ? err.message : 'Erreur lors de la sauvegarde')
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-slate-700">
-          <h2 className="text-xl font-bold text-white">
+    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="text-2xl font-bold text-gray-900">
             {isEditing ? 'Modifier l\'avatar' : 'Nouvel avatar'}
-          </h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-white">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
+          </DialogTitle>
+        </DialogHeader>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6 py-4">
           {error && (
-            <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
               {error}
             </div>
           )}
 
           {/* Name */}
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">
-              Nom de l'avatar
-            </label>
-            <input
-              type="text"
+          <div className="space-y-2">
+            <Label htmlFor="avatar-name">Nom de l'avatar *</Label>
+            <Input
+              id="avatar-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Ex: Marie Dupont"
-              className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 transition-colors"
+              disabled={saving}
             />
           </div>
 
-          {/* Voice Upload */}
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">
-              Voix de référence (MP3)
-            </label>
-            <div className="flex gap-3">
-              <input
-                type="text"
+          {/* Voice URL */}
+          <div className="space-y-2">
+            <Label>Voix de référence (MP3) *</Label>
+            <div className="flex gap-2">
+              <Input
                 value={voiceUrl}
                 onChange={(e) => setVoiceUrl(e.target.value)}
-                placeholder="URL du fichier MP3..."
-                className="flex-1 px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 transition-colors text-sm"
+                placeholder="URL du fichier MP3 ou uploadez..."
+                className="flex-1"
+                disabled={saving}
               />
-              <label className="px-4 py-3 bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded-lg text-white cursor-pointer transition-colors whitespace-nowrap">
-                {uploading ? '...' : 'Upload'}
+              <label className="cursor-pointer">
+                <Button type="button" variant="outline" disabled={uploading || saving} asChild>
+                  <span>{uploading ? '...' : 'Upload'}</span>
+                </Button>
                 <input
                   type="file"
                   accept="audio/*"
@@ -365,25 +423,28 @@ function AvatarModal({
               </label>
             </div>
             {voiceUrl && (
-              <audio src={voiceUrl} controls className="mt-2 w-full h-10" />
+              <audio src={voiceUrl} controls className="w-full h-10 mt-2" />
             )}
+            <p className="text-xs text-gray-500">
+              Astuce: Utilisez une URL publique comme https://dataiads-test1.fr/sudouest/voix.mp3
+            </p>
           </div>
 
-          {/* Image Upload */}
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">
-              Image de l'avatar (PNG, JPG)
-            </label>
-            <div className="flex gap-3">
-              <input
-                type="text"
+          {/* Image URL */}
+          <div className="space-y-2">
+            <Label>Image de l'avatar (PNG, JPG) *</Label>
+            <div className="flex gap-2">
+              <Input
                 value={imageUrl}
                 onChange={(e) => setImageUrl(e.target.value)}
-                placeholder="URL de l'image..."
-                className="flex-1 px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 transition-colors text-sm"
+                placeholder="URL de l'image ou uploadez..."
+                className="flex-1"
+                disabled={saving}
               />
-              <label className="px-4 py-3 bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded-lg text-white cursor-pointer transition-colors whitespace-nowrap">
-                {uploading ? '...' : 'Upload'}
+              <label className="cursor-pointer">
+                <Button type="button" variant="outline" disabled={uploading || saving} asChild>
+                  <span>{uploading ? '...' : 'Upload'}</span>
+                </Button>
                 <input
                   type="file"
                   accept="image/*"
@@ -396,32 +457,50 @@ function AvatarModal({
               </label>
             </div>
             {imageUrl && (
-              <div className="mt-2 w-24 h-24 rounded-lg overflow-hidden border border-slate-600">
-                <img src={imageUrl} alt="Preview" className="w-full h-full object-cover" />
+              <div className="mt-2 w-20 h-20 rounded-lg overflow-hidden border border-gray-200">
+                <img 
+                  src={imageUrl} 
+                  alt="Aperçu" 
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none'
+                  }}
+                />
               </div>
             )}
+            <p className="text-xs text-gray-500">
+              Astuce: Utilisez une URL publique comme https://dataiads-test1.fr/sudouest/avatarsudsouest.png
+            </p>
           </div>
 
-          {/* Submit */}
+          {/* Actions */}
           <div className="flex gap-3 pt-4">
-            <button
+            <Button
               type="button"
+              variant="outline"
               onClick={onClose}
-              className="flex-1 px-4 py-3 bg-slate-700 hover:bg-slate-600 rounded-lg text-white font-medium transition-colors"
+              disabled={saving}
+              className="flex-1"
             >
               Annuler
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
-              disabled={saving || uploading}
-              className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-white font-medium transition-colors"
+              disabled={saving || uploading || !name.trim() || !voiceUrl || !imageUrl}
+              className="flex-1 bg-[#D42E1B] hover:bg-[#B01030]"
             >
-              {saving ? 'Enregistrement...' : isEditing ? 'Enregistrer' : 'Créer'}
-            </button>
+              {saving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Enregistrement...
+                </>
+              ) : (
+                isEditing ? 'Enregistrer' : 'Créer'
+              )}
+            </Button>
           </div>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }
-

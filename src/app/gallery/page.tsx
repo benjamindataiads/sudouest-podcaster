@@ -10,8 +10,43 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import SudOuestLogo from '@/components/ui/SudOuestLogo'
-import { Loader2, Film, Check, X, ArrowUp, ArrowDown, Trash2, Download, Home, Newspaper, FileText, Video } from 'lucide-react'
+import { Loader2, Film, Check, X, ArrowUp, ArrowDown, Trash2, Download, Home, Newspaper, FileText, Video, Type, Settings2 } from 'lucide-react'
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
+
+// Subtitle configuration types
+interface SubtitleConfig {
+  fontName: string
+  fontSize: number
+  fontColor: string
+  highlightColor: string
+  strokeWidth: number
+  strokeColor: string
+  position: 'top' | 'center' | 'bottom'
+  yOffset: number
+  wordsPerSubtitle: number
+  enableAnimation: boolean
+}
+
+const DEFAULT_SUBTITLE_CONFIG: SubtitleConfig = {
+  fontName: 'Montserrat',
+  fontSize: 80,
+  fontColor: 'white',
+  highlightColor: 'yellow',
+  strokeWidth: 3,
+  strokeColor: 'black',
+  position: 'bottom',
+  yOffset: 75,
+  wordsPerSubtitle: 3,
+  enableAnimation: true,
+}
+
+const FONT_OPTIONS = ['Montserrat', 'Poppins', 'Bebas Neue', 'Oswald', 'Inter', 'Roboto', 'BBH Sans Hegarty']
+const COLOR_OPTIONS = ['white', 'black', 'red', 'green', 'blue', 'yellow', 'orange', 'purple', 'pink', 'cyan', 'magenta']
+const POSITION_OPTIONS = [
+  { value: 'top', label: 'Haut' },
+  { value: 'center', label: 'Centre' },
+  { value: 'bottom', label: 'Bas' },
+]
 
 interface SelectedVideo {
   id: string
@@ -35,6 +70,12 @@ function GalleryPageContent() {
   
   // Ref to prevent multiple workers from running simultaneously
   const workerRunningRef = useRef(false)
+  
+  // Subtitle state
+  const [subtitleConfig, setSubtitleConfig] = useState<SubtitleConfig>(DEFAULT_SUBTITLE_CONFIG)
+  const [isGeneratingSubtitles, setIsGeneratingSubtitles] = useState(false)
+  const [subtitledVideoUrl, setSubtitledVideoUrl] = useState<string>('')
+  const [showSubtitleOptions, setShowSubtitleOptions] = useState(false)
 
   // Charger le podcast pour afficher la navigation
   useEffect(() => {
@@ -253,6 +294,48 @@ function GalleryPageContent() {
     } finally {
       setIsMerging(false)
       setProgress(0)
+    }
+  }
+
+  // Generate subtitles for the merged video
+  const generateSubtitles = async () => {
+    const videoToSubtitle = subtitledVideoUrl || mergedVideoUrl
+    
+    if (!videoToSubtitle) {
+      alert('Veuillez d\'abord assembler une vidéo')
+      return
+    }
+
+    try {
+      setIsGeneratingSubtitles(true)
+      console.log('📝 Generating subtitles for:', videoToSubtitle)
+      console.log('   Config:', subtitleConfig)
+
+      const response = await fetch('/api/genai/subtitle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          videoUrl: videoToSubtitle,
+          ...subtitleConfig,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.details || errorData.error || 'Erreur lors de la génération des sous-titres')
+      }
+
+      const data = await response.json()
+      console.log('✅ Subtitles generated:', data.videoUrl)
+      console.log('   Subtitle count:', data.subtitleCount)
+      
+      setSubtitledVideoUrl(data.videoUrl)
+      alert(`✅ Sous-titres générés ! (${data.subtitleCount} segments)`)
+    } catch (error) {
+      console.error('❌ Erreur lors de la génération des sous-titres:', error)
+      alert(`Erreur: ${error instanceof Error ? error.message : 'Erreur inconnue'}`)
+    } finally {
+      setIsGeneratingSubtitles(false)
     }
   }
 
@@ -647,9 +730,9 @@ function GalleryPageContent() {
           {mergedVideoUrl && (
             <Card className="border-green-500 bg-green-50">
               <CardHeader>
-                <CardTitle className="text-green-900">✅ Vidéo finale assemblée</CardTitle>
+                <CardTitle className="text-green-900">✅ Vidéo assemblée</CardTitle>
                 <CardDescription className="text-green-700">
-                  Prête à être publiée
+                  {subtitledVideoUrl ? 'Vidéo de base (sans sous-titres)' : 'Prête pour les sous-titres ou la publication'}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -658,9 +741,280 @@ function GalleryPageContent() {
                   controls 
                   className="w-full rounded border-2 border-green-200"
                 />
+                {!subtitledVideoUrl && (
+                  <div className="flex gap-2">
+                    <Button asChild className="flex-1 bg-green-600 hover:bg-green-700">
+                      <a href={mergedVideoUrl} download="podcast-final.mp4">
+                        <Download className="mr-2 h-4 w-4" />
+                        Télécharger
+                      </a>
+                    </Button>
+                    <Button 
+                      onClick={async () => {
+                        if (!podcastId) {
+                          alert('⚠️ Aucun podcast associé. Impossible de sauvegarder.')
+                          return
+                        }
+                        
+                        try {
+                          const res = await fetch(`/api/podcasts/save`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              id: podcastId,
+                              finalVideoUrl: mergedVideoUrl,
+                              status: 'completed',
+                              completedAt: new Date(),
+                            }),
+                          })
+                          if (res.ok) {
+                            alert('✅ Vidéo finale sauvegardée dans le podcast !')
+                            window.location.href = '/'
+                          } else {
+                            alert('❌ Erreur lors de la sauvegarde')
+                          }
+                        } catch (err) {
+                          alert('❌ Erreur lors de la sauvegarde')
+                        }
+                      }}
+                      className="flex-1 bg-blue-600 hover:bg-blue-700"
+                      disabled={!podcastId}
+                    >
+                      💾 Sauvegarder sans sous-titres
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Section sous-titres (optionnel) */}
+          {mergedVideoUrl && (
+            <Card className={subtitledVideoUrl ? 'border-purple-500 bg-purple-50' : ''}>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className={subtitledVideoUrl ? 'text-purple-900' : ''}>
+                      <Type className="inline-block mr-2 h-5 w-5" />
+                      Sous-titres (optionnel)
+                    </CardTitle>
+                    <CardDescription className={subtitledVideoUrl ? 'text-purple-700' : ''}>
+                      Ajoutez des sous-titres automatiques style TikTok
+                    </CardDescription>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowSubtitleOptions(!showSubtitleOptions)}
+                  >
+                    <Settings2 className="h-4 w-4 mr-2" />
+                    {showSubtitleOptions ? 'Masquer' : 'Options'}
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Configuration des sous-titres */}
+                {showSubtitleOptions && (
+                  <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg space-y-4">
+                    <h4 className="text-sm font-semibold text-gray-900">Configuration des sous-titres</h4>
+                    
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                      {/* Font name */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Police</label>
+                        <select
+                          value={subtitleConfig.fontName}
+                          onChange={(e) => setSubtitleConfig({ ...subtitleConfig, fontName: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                        >
+                          {FONT_OPTIONS.map(font => (
+                            <option key={font} value={font}>{font}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Font size */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Taille ({subtitleConfig.fontSize}px)</label>
+                        <input
+                          type="range"
+                          min="40"
+                          max="120"
+                          value={subtitleConfig.fontSize}
+                          onChange={(e) => setSubtitleConfig({ ...subtitleConfig, fontSize: parseInt(e.target.value) })}
+                          className="w-full"
+                        />
+                      </div>
+
+                      {/* Font color */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Couleur texte</label>
+                        <select
+                          value={subtitleConfig.fontColor}
+                          onChange={(e) => setSubtitleConfig({ ...subtitleConfig, fontColor: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                        >
+                          {COLOR_OPTIONS.map(color => (
+                            <option key={color} value={color}>{color}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Highlight color */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Couleur surbrillance</label>
+                        <select
+                          value={subtitleConfig.highlightColor}
+                          onChange={(e) => setSubtitleConfig({ ...subtitleConfig, highlightColor: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                        >
+                          {COLOR_OPTIONS.map(color => (
+                            <option key={color} value={color}>{color}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Stroke width */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Contour ({subtitleConfig.strokeWidth}px)</label>
+                        <input
+                          type="range"
+                          min="0"
+                          max="10"
+                          value={subtitleConfig.strokeWidth}
+                          onChange={(e) => setSubtitleConfig({ ...subtitleConfig, strokeWidth: parseInt(e.target.value) })}
+                          className="w-full"
+                        />
+                      </div>
+
+                      {/* Stroke color */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Couleur contour</label>
+                        <select
+                          value={subtitleConfig.strokeColor}
+                          onChange={(e) => setSubtitleConfig({ ...subtitleConfig, strokeColor: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                        >
+                          {COLOR_OPTIONS.map(color => (
+                            <option key={color} value={color}>{color}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Position */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Position</label>
+                        <select
+                          value={subtitleConfig.position}
+                          onChange={(e) => setSubtitleConfig({ ...subtitleConfig, position: e.target.value as 'top' | 'center' | 'bottom' })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                        >
+                          {POSITION_OPTIONS.map(pos => (
+                            <option key={pos.value} value={pos.value}>{pos.label}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Y Offset */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Décalage Y ({subtitleConfig.yOffset}px)</label>
+                        <input
+                          type="range"
+                          min="-200"
+                          max="200"
+                          value={subtitleConfig.yOffset}
+                          onChange={(e) => setSubtitleConfig({ ...subtitleConfig, yOffset: parseInt(e.target.value) })}
+                          className="w-full"
+                        />
+                      </div>
+
+                      {/* Words per subtitle */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Mots par ligne ({subtitleConfig.wordsPerSubtitle})</label>
+                        <input
+                          type="range"
+                          min="1"
+                          max="12"
+                          value={subtitleConfig.wordsPerSubtitle}
+                          onChange={(e) => setSubtitleConfig({ ...subtitleConfig, wordsPerSubtitle: parseInt(e.target.value) })}
+                          className="w-full"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Animation toggle */}
+                    <label className="flex items-center gap-3 cursor-pointer pt-2">
+                      <input
+                        type="checkbox"
+                        checked={subtitleConfig.enableAnimation}
+                        onChange={(e) => setSubtitleConfig({ ...subtitleConfig, enableAnimation: e.target.checked })}
+                        className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                      />
+                      <span className="text-sm font-medium text-gray-900">
+                        Animation des sous-titres (style bounce)
+                      </span>
+                    </label>
+
+                    {/* Reset button */}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSubtitleConfig(DEFAULT_SUBTITLE_CONFIG)}
+                      className="text-gray-500"
+                    >
+                      Réinitialiser les options
+                    </Button>
+                  </div>
+                )}
+
+                {/* Generate button */}
+                <Button
+                  onClick={generateSubtitles}
+                  disabled={isGeneratingSubtitles}
+                  className="w-full bg-purple-600 hover:bg-purple-700"
+                  size="lg"
+                >
+                  {isGeneratingSubtitles ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Génération des sous-titres en cours...
+                    </>
+                  ) : (
+                    <>
+                      <Type className="mr-2 h-4 w-4" />
+                      {subtitledVideoUrl ? 'Régénérer les sous-titres' : 'Générer les sous-titres'}
+                    </>
+                  )}
+                </Button>
+
+                {/* Preview info */}
+                {!subtitledVideoUrl && (
+                  <p className="text-xs text-center text-gray-500">
+                    Les sous-titres seront générés automatiquement en français (style TikTok/karaoké)
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Vidéo avec sous-titres */}
+          {subtitledVideoUrl && (
+            <Card className="border-green-500 bg-green-50">
+              <CardHeader>
+                <CardTitle className="text-green-900">✅ Vidéo finale avec sous-titres</CardTitle>
+                <CardDescription className="text-green-700">
+                  Prête à être publiée
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <video 
+                  src={subtitledVideoUrl} 
+                  controls 
+                  className="w-full rounded border-2 border-green-200"
+                />
                 <div className="flex gap-2">
                   <Button asChild className="flex-1 bg-green-600 hover:bg-green-700">
-                    <a href={mergedVideoUrl} download="podcast-final.mp4">
+                    <a href={subtitledVideoUrl} download="podcast-final-subtitles.mp4">
                       <Download className="mr-2 h-4 w-4" />
                       Télécharger
                     </a>
@@ -678,14 +1032,13 @@ function GalleryPageContent() {
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({
                             id: podcastId,
-                            finalVideoUrl: mergedVideoUrl,
+                            finalVideoUrl: subtitledVideoUrl,
                             status: 'completed',
                             completedAt: new Date(),
                           }),
                         })
                         if (res.ok) {
-                          alert('✅ Vidéo finale sauvegardée dans le podcast !')
-                          // Rafraîchir pour voir le changement
+                          alert('✅ Vidéo avec sous-titres sauvegardée !')
                           window.location.href = '/'
                         } else {
                           alert('❌ Erreur lors de la sauvegarde')
@@ -697,7 +1050,7 @@ function GalleryPageContent() {
                     className="flex-1 bg-blue-600 hover:bg-blue-700"
                     disabled={!podcastId}
                   >
-                    💾 Sauvegarder dans le podcast
+                    💾 Sauvegarder comme vidéo finale
                   </Button>
                 </div>
               </CardContent>

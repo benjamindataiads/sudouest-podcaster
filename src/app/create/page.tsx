@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, Suspense, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -13,8 +13,9 @@ import StepTwo from '@/components/features/StepTwo'
 import StepThree from '@/components/features/StepThree'
 import StepFour from '@/components/features/StepFour'
 import { ArticleWithScore, PodcastScript } from '@/types'
-import { AudioChunk } from '@/lib/services/fal'
-import { Loader2, FileText, Video, Newspaper, CheckCircle2, Home, Mic, Film } from 'lucide-react'
+import { AudioChunk } from '@/lib/genai/types'
+import { useGenAIStream } from '@/hooks/useGenAIStream'
+import { Loader2, FileText, Video, Newspaper, CheckCircle2, Home, Mic, Film, Wifi, WifiOff } from 'lucide-react'
 
 interface Avatar {
   id: number
@@ -36,6 +37,46 @@ function CreatePodcastPageContent() {
   const [audioChunks, setAudioChunks] = useState<AudioChunk[]>([])
   const [loadingResume, setLoadingResume] = useState(false)
   const [avatar, setAvatar] = useState<Avatar | null>(null)
+  const [audioProgress, setAudioProgress] = useState<{ completed: number; total: number }>({ completed: 0, total: 0 })
+
+  // SSE callbacks for real-time updates
+  const handleAudioChunkComplete = useCallback((chunkIndex: number, chunkUrl: string, totalChunks: number) => {
+    console.log(`🎤 Audio chunk ${chunkIndex + 1}/${totalChunks} received via SSE`)
+    setAudioChunks(prev => {
+      const updated = [...prev]
+      if (updated[chunkIndex]) {
+        updated[chunkIndex] = { ...updated[chunkIndex], url: chunkUrl }
+      }
+      return updated
+    })
+    setAudioProgress({ completed: chunkIndex + 1, total: totalChunks })
+  }, [])
+
+  const handleAllAudioComplete = useCallback((chunks: AudioChunk[]) => {
+    console.log('🎉 All audio complete via SSE!')
+    setAudioChunks(chunks)
+    setAudioUrl(chunks[0]?.url || '')
+    setAudioProgress({ completed: chunks.length, total: chunks.length })
+  }, [])
+
+  const handleVideoComplete = useCallback((videoUrl: string) => {
+    console.log('🎬 Video complete via SSE:', videoUrl)
+    // Video updates handled by StepFour
+  }, [])
+
+  const handleGenAIError = useCallback((jobType: string, error: string) => {
+    console.error(`❌ ${jobType} error via SSE:`, error)
+    alert(`Erreur de génération ${jobType}: ${error}`)
+  }, [])
+
+  // Connect to SSE stream for real-time updates
+  const { connected: sseConnected } = useGenAIStream({
+    podcastId,
+    onAudioChunkComplete: handleAudioChunkComplete,
+    onAllAudioComplete: handleAllAudioComplete,
+    onVideoComplete: handleVideoComplete,
+    onError: handleGenAIError,
+  })
 
   // Load podcast if resuming
   useEffect(() => {
@@ -160,30 +201,6 @@ function CreatePodcastPageContent() {
       estimatedDuration: generatedScript.estimatedDuration,
     })
 
-    // Créer un job audio en DB (status: queued)
-    const jobId = `audio-job-${Date.now()}-${Math.random().toString(36).substring(7)}`
-    
-    // Use avatar voice URL or fallback to default
-    const voiceUrl = avatar?.voiceUrl || 'https://dataiads-test1.fr/sudouest/voix.mp3'
-    console.log(`🎤 Using voice URL for audio generation: ${voiceUrl}`)
-    
-    await fetch('/api/audio-jobs', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        id: jobId,
-        podcastId: podcastId || null,
-        scriptChunks: generatedScript.chunks || null,
-        voiceUrl: voiceUrl,
-        status: 'queued',
-      }),
-    })
-
-    console.log(`✅ Audio job created: ${jobId}, worker will process it`)
-
-    // Passer directement à l'étape Vidéo
-    setCurrentStep('4')
-    
     // Créer des placeholders pour l'audio
     const placeholders = (generatedScript.chunks || []).map((chunk, idx) => ({
       url: '',
@@ -195,6 +212,39 @@ function CreatePodcastPageContent() {
     
     setAudioChunks(placeholders as AudioChunk[])
     setAudioUrl('generating')
+    setAudioProgress({ completed: 0, total: placeholders.length })
+
+    // Use the new GenAI audio endpoint
+    console.log(`🎤 Starting audio generation via /api/genai/audio`)
+    
+    try {
+      const response = await fetch('/api/genai/audio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          podcastId: podcastId,
+          scriptChunks: generatedScript.chunks || [],
+          voiceUrl: avatar?.voiceUrl, // Will use avatar from podcast if not provided
+        }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.details || error.error || 'Failed to start audio generation')
+      }
+
+      const result = await response.json()
+      console.log(`✅ Audio generation started: ${result.jobId}`)
+      console.log(`   Chunks submitted: ${result.chunksSubmitted}`)
+      console.log(`   SSE updates will arrive automatically`)
+
+    } catch (error) {
+      console.error('❌ Failed to start audio generation:', error)
+      alert(`Erreur: ${error instanceof Error ? error.message : 'Impossible de démarrer la génération audio'}`)
+    }
+
+    // Passer directement à l'étape Vidéo
+    setCurrentStep('4')
   }
 
   const handleStep3Complete = async (audio: string, chunks?: AudioChunk[]) => {
@@ -250,9 +300,17 @@ function CreatePodcastPageContent() {
               </Button>
             </Link>
             {podcastId && (
-              <span className="text-xs bg-white/20 px-3 py-1 rounded-full">
-                ID: #{podcastId}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs bg-white/20 px-3 py-1 rounded-full">
+                  ID: #{podcastId}
+                </span>
+                <span className={`flex items-center gap-1 text-xs px-2 py-1 rounded-full ${
+                  sseConnected ? 'bg-green-500/30 text-green-100' : 'bg-yellow-500/30 text-yellow-100'
+                }`}>
+                  {sseConnected ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
+                  {sseConnected ? 'Live' : 'Reconnecting...'}
+                </span>
+              </div>
             )}
           </div>
         </div>

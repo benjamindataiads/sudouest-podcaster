@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db, audioJobs, videoJobs } from '@/lib/db'
 import { eq, sql } from 'drizzle-orm'
 import { uploadAudioToBucket, uploadVideoToBucket, isBucketConfigured } from '@/lib/services/storage'
+import { notifyJobCompleted, notifyJobFailed } from '@/lib/genai/sse-manager'
 
 export const dynamic = 'force-dynamic'
 
@@ -118,6 +119,11 @@ async function handleVideoJobCallback(
     
     console.log(`✅ Video job ${job.id} completed: ${finalVideoUrl}`)
     
+    // Notify via SSE
+    if (job.podcastId) {
+      notifyJobCompleted(job.podcastId, job.id, 'video', { videoUrl: finalVideoUrl })
+    }
+    
     return NextResponse.json({ success: true, jobId: job.id, type: 'video', videoUrl: finalVideoUrl })
   } else {
     // Error - update job with error
@@ -134,6 +140,11 @@ async function handleVideoJobCallback(
       .where(eq(videoJobs.id, job.id))
     
     console.error(`❌ Video job ${job.id} failed: ${errorMessage}`)
+    
+    // Notify via SSE
+    if (job.podcastId) {
+      notifyJobFailed(job.podcastId, job.id, 'video', errorMessage)
+    }
     
     return NextResponse.json({ success: false, jobId: job.id, error: errorMessage })
   }
@@ -250,7 +261,22 @@ async function handleAudioChunkCallback(
           .where(eq(podcasts.id, job.podcastId))
         
         console.log(`✅ Podcast ${job.podcastId} updated with completed audio`)
+        
+        // Notify via SSE that all audio is complete
+        notifyJobCompleted(job.podcastId, job.id, 'audio', { 
+          audioChunks: currentChunks,
+          allComplete: true,
+        })
       }
+    } else if (job.podcastId) {
+      // Notify progress (chunk completed but not all)
+      notifyJobCompleted(job.podcastId, job.id, 'audio', { 
+        chunkIndex,
+        chunkUrl: audioUrl,
+        completedChunks: currentChunks.length,
+        totalChunks: falRequestIds.length,
+        allComplete: false,
+      })
     }
     
     return NextResponse.json({ 
@@ -274,6 +300,11 @@ async function handleAudioChunkCallback(
       .where(eq(audioJobs.id, job.id))
     
     console.error(`❌ Audio chunk ${chunkIndex} failed for job ${job.id}: ${errorMessage}`)
+    
+    // Notify via SSE
+    if (job.podcastId) {
+      notifyJobFailed(job.podcastId, job.id, 'audio', errorMessage)
+    }
     
     return NextResponse.json({ success: false, jobId: job.id, error: errorMessage })
   }

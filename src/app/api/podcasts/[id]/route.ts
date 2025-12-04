@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 export const dynamic = 'force-dynamic'
-import { db, podcasts, audioFiles, videoFiles } from '@/lib/db'
+import { db, podcasts, audioFiles, videoFiles, avatars } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 
 /**
  * GET /api/podcasts/[id]
- * Récupère un podcast spécifique
+ * Récupère un podcast spécifique avec son avatar
  */
 export async function GET(
   request: NextRequest,
@@ -34,7 +34,28 @@ export async function GET(
       )
     }
 
-    return NextResponse.json({ podcast })
+    // Load avatar if avatarId exists
+    let avatar = null
+    if (podcast.avatarId) {
+      const [avatarData] = await db
+        .select()
+        .from(avatars)
+        .where(eq(avatars.id, podcast.avatarId))
+        .limit(1)
+      avatar = avatarData
+    }
+
+    // If no avatar, try to get default avatar
+    if (!avatar) {
+      const [defaultAvatar] = await db
+        .select()
+        .from(avatars)
+        .where(eq(avatars.isDefault, true))
+        .limit(1)
+      avatar = defaultAvatar
+    }
+
+    return NextResponse.json({ podcast, avatar })
   } catch (error) {
     console.error('Error fetching podcast:', error)
     return NextResponse.json(

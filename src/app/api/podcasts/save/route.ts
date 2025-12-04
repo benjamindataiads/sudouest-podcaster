@@ -24,6 +24,7 @@ export async function POST(request: NextRequest) {
       videoUrls,
       finalVideoUrl,
       estimatedDuration,
+      avatarId,
     } = body
 
     // Si ID existe, mettre à jour
@@ -70,6 +71,7 @@ export async function POST(request: NextRequest) {
       videoUrls: videoUrls || undefined,
       finalVideoUrl: finalVideoUrl || undefined,
       estimatedDuration: estimatedDuration || undefined,
+      avatarId: avatarId || undefined,
     }
 
     const [newPodcast] = await db

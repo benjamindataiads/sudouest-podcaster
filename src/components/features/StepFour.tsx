@@ -9,10 +9,19 @@ import { AVAILABLE_AVATARS, AudioChunk } from '@/lib/services/fal'
 import { useVideoGeneration } from '@/contexts/VideoGenerationContext'
 import { Loader2, Download, X, Film } from 'lucide-react'
 
+interface Avatar {
+  id: number
+  name: string
+  voiceUrl: string
+  imageUrl: string
+  isDefault: boolean
+}
+
 interface StepFourProps {
   audioUrl: string
   audioChunks?: AudioChunk[]
   podcastId?: number | null
+  avatar?: Avatar | null
   onBack: () => void
   onVideoGenerated?: (videoUrl: string) => Promise<void>
   onVideosGenerated?: (videoUrls: string[]) => Promise<void>
@@ -22,6 +31,7 @@ export default function StepFour({
   audioUrl, 
   audioChunks = [],
   podcastId,
+  avatar,
   onBack,
   onVideoGenerated,
   onVideosGenerated 
@@ -44,7 +54,9 @@ export default function StepFour({
   const audioPollingRef = useRef<NodeJS.Timeout | null>(null)
   
   const hasMultipleChunks = audioChunks && audioChunks.length > 1
-  const avatarImageUrl = 'https://dataiads-test1.fr/sudouest/avatarsudsouest.png'
+  // Use avatar image from props, or fallback to default
+  const avatarImageUrl = avatar?.imageUrl || 'https://dataiads-test1.fr/sudouest/avatarsudsouest.png'
+  const avatarName = avatar?.name || 'Avatar Sud-Ouest'
 
   // Charger les jobs au montage
   useEffect(() => {
@@ -519,11 +531,11 @@ export default function StepFour({
           <div className="flex items-start space-x-4 p-4 bg-gray-50 rounded-lg">
             <img 
               src={avatarImageUrl} 
-              alt="Avatar Sud-Ouest"
+              alt={avatarName}
               className="w-32 h-32 object-cover rounded-lg border-2 border-gray-300"
             />
             <div className="flex-1">
-              <h3 className="font-semibold mb-2">Avatar Sud-Ouest</h3>
+              <h3 className="font-semibold mb-2">{avatarName}</h3>
               <p className="text-sm text-gray-600 mb-3">
                 Cet avatar sera utilisé pour générer les vidéos avec lip-sync via Kling AI Avatar.
               </p>

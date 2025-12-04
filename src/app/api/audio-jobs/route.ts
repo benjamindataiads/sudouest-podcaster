@@ -46,11 +46,13 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { id, podcastId, scriptChunks, voiceId, status = 'queued' } = body
+    const { id, podcastId, scriptChunks, voiceUrl, voiceId, status = 'queued' } = body
 
-    if (!id || !voiceId) {
+    // Support both voiceUrl (new) and voiceId (legacy)
+    const voice = voiceUrl || voiceId
+    if (!id || !voice) {
       return NextResponse.json(
-        { error: 'Paramètres manquants: id, voiceId requis' },
+        { error: 'Paramètres manquants: id, voiceUrl requis' },
         { status: 400 }
       )
     }
@@ -61,12 +63,12 @@ export async function POST(request: NextRequest) {
         id,
         podcastId: podcastId || null,
         scriptChunks: scriptChunks || null,
-        voiceId,
+        voiceId: voice, // Store the voice URL in voiceId field
         status,
       })
       .returning()
 
-    console.log(`✅ Created audio job: ${id}`)
+    console.log(`✅ Created audio job: ${id} with voice: ${voice}`)
     
     return NextResponse.json({ job: newJob })
   } catch (error) {

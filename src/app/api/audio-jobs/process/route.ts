@@ -47,9 +47,16 @@ export async function POST() {
       }, { status: 400 })
     }
 
-    // Get avatar voice URL from podcast
+    // Get voice URL - priority: job.voiceId > podcast.avatar > default
     let voiceUrl: string | undefined
-    if (queuedJob.podcastId) {
+    
+    // First check if voiceId is a URL (new approach)
+    if (queuedJob.voiceId && queuedJob.voiceId.startsWith('http')) {
+      voiceUrl = queuedJob.voiceId
+      console.log(`🎤 Using voice URL from job: ${voiceUrl}`)
+    }
+    // Otherwise try to get from podcast's avatar
+    else if (queuedJob.podcastId) {
       const [podcast] = await db
         .select()
         .from(podcasts)
@@ -68,6 +75,12 @@ export async function POST() {
           console.log(`🎤 Using avatar voice: ${avatar.name} (${voiceUrl})`)
         }
       }
+    }
+    
+    // Fallback to default voice
+    if (!voiceUrl) {
+      voiceUrl = 'https://dataiads-test1.fr/sudouest/voix.mp3'
+      console.log(`🎤 Using default voice: ${voiceUrl}`)
     }
 
     try {

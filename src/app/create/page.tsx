@@ -16,6 +16,14 @@ import { ArticleWithScore, PodcastScript } from '@/types'
 import { AudioChunk } from '@/lib/services/fal'
 import { Loader2, FileText, Video, Newspaper, CheckCircle2, Home, Mic, Film } from 'lucide-react'
 
+interface Avatar {
+  id: number
+  name: string
+  voiceUrl: string
+  imageUrl: string
+  isDefault: boolean
+}
+
 function CreatePodcastPageContent() {
   const searchParams = useSearchParams()
   const resumeId = searchParams.get('resume')
@@ -27,6 +35,7 @@ function CreatePodcastPageContent() {
   const [audioUrl, setAudioUrl] = useState<string>('')
   const [audioChunks, setAudioChunks] = useState<AudioChunk[]>([])
   const [loadingResume, setLoadingResume] = useState(false)
+  const [avatar, setAvatar] = useState<Avatar | null>(null)
 
   // Load podcast if resuming
   useEffect(() => {
@@ -54,6 +63,12 @@ function CreatePodcastPageContent() {
           if (podcast.audioChunks.length > 0) {
             setAudioUrl(podcast.audioChunks[0].url)
           }
+        }
+        
+        // Load avatar from response
+        if (data.avatar) {
+          setAvatar(data.avatar)
+          console.log('✅ Avatar loaded:', data.avatar.name)
         }
         
         // Set current step based on podcast status
@@ -148,6 +163,10 @@ function CreatePodcastPageContent() {
     // Créer un job audio en DB (status: queued)
     const jobId = `audio-job-${Date.now()}-${Math.random().toString(36).substring(7)}`
     
+    // Use avatar voice URL or fallback to default
+    const voiceUrl = avatar?.voiceUrl || 'https://dataiads-test1.fr/sudouest/voix.mp3'
+    console.log(`🎤 Using voice URL for audio generation: ${voiceUrl}`)
+    
     await fetch('/api/audio-jobs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -155,7 +174,7 @@ function CreatePodcastPageContent() {
         id: jobId,
         podcastId: podcastId || null,
         scriptChunks: generatedScript.chunks || null,
-        voiceId: 'sudouest-clone',
+        voiceUrl: voiceUrl,
         status: 'queued',
       }),
     })
@@ -381,6 +400,7 @@ function CreatePodcastPageContent() {
               audioUrl={audioUrl}
               audioChunks={audioChunks}
               podcastId={podcastId}
+              avatar={avatar}
               onBack={() => setCurrentStep('2')}
               onVideoGenerated={async (videoUrl: string) => {
                 await savePodcast({

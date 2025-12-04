@@ -1,33 +1,13 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
-// Define which routes require authentication
-const isProtectedRoute = createRouteMatcher([
-  '/create(.*)',
-  '/gallery(.*)',
-  '/avatars(.*)',
-  // Protected API routes (write operations)
-  '/api/podcasts/save(.*)',
-  '/api/podcasts/delete(.*)',
-  '/api/audio-jobs/process(.*)',
-  '/api/video-jobs/process(.*)',
-  '/api/avatars(.*)',
-  '/api/articles/analyze(.*)',
-  '/api/video/assemble(.*)',
-])
-
-// Define public routes (always accessible)
+// Define public routes (accessible without auth)
 const isPublicRoute = createRouteMatcher([
-  '/',
   '/sign-in(.*)',
   '/sign-up(.*)',
-  // Public API routes (read operations)
+  // API routes that must be public (webhooks from external services)
   '/api/webhooks(.*)',
   '/api/files(.*)',
   '/api/db/migrate(.*)',
-  '/api/debug(.*)',
-  '/api/podcasts/latest(.*)',
-  '/api/video-jobs/check-stale(.*)',
-  '/api/articles(.*)',
 ])
 
 export default clerkMiddleware(async (auth, req) => {
@@ -36,8 +16,8 @@ export default clerkMiddleware(async (auth, req) => {
     return
   }
 
-  // Protect routes that require authentication
-  if (isProtectedRoute(req) && !isPublicRoute(req)) {
+  // Protect ALL routes except public ones
+  if (!isPublicRoute(req)) {
     await auth.protect()
   }
 });

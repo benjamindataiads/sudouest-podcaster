@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 export const dynamic = 'force-dynamic'
+export const maxDuration = 300 // 5 minutes timeout for video assembly
 import { concatenateVideos } from '@/lib/services/video-processor'
 import { uploadFinalPodcastToBucket, isBucketConfigured } from '@/lib/services/storage'
 import path from 'path'

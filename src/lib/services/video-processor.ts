@@ -219,7 +219,7 @@ async function addFadesToVideo(
     command
       .outputOptions([
         '-c:v', 'libx264',
-        '-preset', 'fast',
+        '-preset', 'ultrafast', // Much faster encoding
         '-crf', '23',
         '-c:a', 'aac',
         '-b:a', '128k',
@@ -287,7 +287,7 @@ export async function concatenateVideos(videoUrls: string[], withTransition: boo
       ffmpeg(downloadPath)
         .outputOptions([
           '-c:v', 'libx264',
-          '-preset', 'fast',
+          '-preset', 'ultrafast', // Much faster encoding
           '-crf', '23',
           '-r', '30',
           '-vf', 'scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:black,setsar=1',
@@ -354,11 +354,7 @@ export async function concatenateVideos(videoUrls: string[], withTransition: boo
       .input(listPath)
       .inputOptions(['-f', 'concat', '-safe', '0'])
       .outputOptions([
-        '-c:v', 'libx264',
-        '-preset', 'fast',
-        '-crf', '23',
-        '-c:a', 'aac',
-        '-b:a', '128k',
+        '-c', 'copy', // Stream copy - no re-encoding (videos already have same format)
         '-movflags', '+faststart',
       ])
       .output(outputPath)

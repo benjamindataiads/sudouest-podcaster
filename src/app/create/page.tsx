@@ -16,11 +16,18 @@ import { ArticleWithScore, PodcastScript } from '@/types'
 import { AudioChunk } from '@/lib/genai/types'
 import { Loader2, FileText, Video, Newspaper, CheckCircle2, Home, Mic, Film } from 'lucide-react'
 
+interface ImageVariation {
+  url: string
+  label: string
+  description?: string
+}
+
 interface Avatar {
   id: number
   name: string
   voiceUrl: string
   imageUrl: string
+  imageVariations?: ImageVariation[]
   isDefault: boolean
 }
 

@@ -142,6 +142,7 @@ export const videoJobs = pgTable('video_jobs', {
   audioUrl: text('audio_url').notNull(),
   text: text('text'),
   section: varchar('section', { length: 50 }),
+  avatarImageUrl: text('avatar_image_url'), // Image variant to use for this segment
   status: varchar('status', { length: 50 }).notNull().default('queued'), // queued, generating, completed, failed
   videoUrl: text('video_url'),
   error: text('error'),

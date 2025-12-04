@@ -28,10 +28,13 @@ export async function POST() {
     console.log(`🎬 Processing video job: ${jobToProcess.id}`)
     console.log(`   Podcast ID: ${jobToProcess.podcastId}`)
     console.log(`   Audio URL: ${jobToProcess.audioUrl}`)
+    console.log(`   Job avatarImageUrl: ${jobToProcess.avatarImageUrl || 'none'}`)
 
-    // Get avatar image URL from podcast
-    let avatarImageUrl: string | undefined
-    if (jobToProcess.podcastId) {
+    // Get avatar image URL - prioritize job-specific image (for variations)
+    let avatarImageUrl: string | undefined = jobToProcess.avatarImageUrl || undefined
+    
+    // If no job-specific image, get from podcast's avatar
+    if (!avatarImageUrl && jobToProcess.podcastId) {
       const [podcast] = await db
         .select()
         .from(podcasts)
@@ -60,6 +63,8 @@ export async function POST() {
       } else {
         console.log(`⚠️ No avatarId on podcast (avatarId: ${podcast?.avatarId}), will use default image`)
       }
+    } else if (avatarImageUrl) {
+      console.log(`✅ Using job-specific image variant: ${avatarImageUrl}`)
     } else {
       console.log(`⚠️ No podcastId on job, will use default image`)
     }

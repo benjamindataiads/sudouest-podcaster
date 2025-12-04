@@ -7,13 +7,20 @@ import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { AVAILABLE_AVATARS, AudioChunk } from '@/lib/services/fal'
 import { useVideoGeneration } from '@/contexts/VideoGenerationContext'
-import { Loader2, Download, X, Film } from 'lucide-react'
+import { Loader2, Download, X, Film, Images, ChevronDown, ChevronUp } from 'lucide-react'
+
+interface ImageVariation {
+  url: string
+  label: string
+  description?: string
+}
 
 interface Avatar {
   id: number
   name: string
   voiceUrl: string
   imageUrl: string
+  imageVariations?: ImageVariation[]
   isDefault: boolean
 }
 
@@ -50,6 +57,8 @@ export default function StepFour({
   const [selectedChunks, setSelectedChunks] = useState<Set<number>>(new Set())
   const [realAudioChunks, setRealAudioChunks] = useState<AudioChunk[]>(audioChunks)
   const [audioGenerating, setAudioGenerating] = useState(audioUrl === 'generating')
+  const [imagePerChunk, setImagePerChunk] = useState<Record<number, string>>({}) // Track selected image per chunk
+  const [showImageSelector, setShowImageSelector] = useState<number | null>(null) // Which chunk has image selector open
   const abortControllerRef = useRef<AbortController | null>(null)
   const audioPollingRef = useRef<NodeJS.Timeout | null>(null)
   
@@ -79,6 +88,16 @@ export default function StepFour({
   // Use avatar image from props, or fallback to default
   const avatarImageUrl = avatar?.imageUrl || 'https://dataiads-test1.fr/sudouest/avatarsudsouest.png'
   const avatarName = avatar?.name || 'Avatar Sud-Ouest'
+  
+  // Get all available images for selection (original + variations)
+  const allAvatarImages: ImageVariation[] = avatar?.imageVariations && avatar.imageVariations.length > 0
+    ? avatar.imageVariations
+    : [{ url: avatarImageUrl, label: 'original', description: 'Image principale' }]
+  
+  // Helper to get selected image for a chunk (or default)
+  const getImageForChunk = (chunkIndex: number): string => {
+    return imagePerChunk[chunkIndex] || avatarImageUrl
+  }
 
   // Charger les jobs au montage
   useEffect(() => {
@@ -203,9 +222,10 @@ export default function StepFour({
     }
 
     const chunk = realAudioChunks[chunkIndex]
+    const selectedImage = getImageForChunk(chunkIndex)
     
-    // Créer un job dans la DB (status: queued)
-    await addJob(chunk.url, chunkIndex, chunk.text, chunk.section, podcastId || undefined)
+    // Créer un job dans la DB (status: queued) with selected image
+    await addJob(chunk.url, chunkIndex, chunk.text, chunk.section, podcastId || undefined, selectedImage)
     
     // Rediriger immédiatement vers la galerie
     const galleryUrl = podcastId ? `/gallery?podcastId=${podcastId}` : '/gallery'
@@ -227,10 +247,11 @@ export default function StepFour({
 
     const selectedIndices = Array.from(selectedChunks).sort((a, b) => a - b)
 
-    // Créer les jobs pour les chunks sélectionnés
+    // Créer les jobs pour les chunks sélectionnés avec l'image choisie pour chacun
     await Promise.all(selectedIndices.map(async (i) => {
       const chunk = realAudioChunks[i]
-      await addJob(chunk.url, i, chunk.text, chunk.section, podcastId || undefined)
+      const selectedImage = getImageForChunk(i)
+      await addJob(chunk.url, i, chunk.text, chunk.section, podcastId || undefined, selectedImage)
     }))
 
     console.log(`✅ Created ${selectedIndices.length} video jobs in database`)
@@ -511,16 +532,32 @@ export default function StepFour({
         <CardContent className="space-y-4">
           {/* Aperçu de l'avatar */}
           <div className="flex items-start space-x-4 p-4 bg-gray-50 rounded-lg">
-            <img 
-              src={avatarImageUrl} 
-              alt={avatarName}
-              className="w-32 h-32 object-cover rounded-lg border-2 border-gray-300"
-            />
+            <div className="relative">
+              <img 
+                src={avatarImageUrl} 
+                alt={avatarName}
+                className="w-32 h-32 object-cover rounded-lg border-2 border-gray-300"
+              />
+              {allAvatarImages.length > 1 && (
+                <div className="absolute -bottom-2 -right-2 bg-orange-500 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1">
+                  <Images className="h-3 w-3" />
+                  {allAvatarImages.length}
+                </div>
+              )}
+            </div>
             <div className="flex-1">
               <h3 className="font-semibold mb-2">{avatarName}</h3>
               <p className="text-sm text-gray-600 mb-3">
                 Cet avatar sera utilisé pour générer les vidéos avec lip-sync via Kling AI Avatar.
               </p>
+              {allAvatarImages.length > 1 && (
+                <div className="p-2 bg-orange-50 border border-orange-200 rounded-lg mb-2">
+                  <p className="text-xs text-orange-700">
+                    <Images className="h-3 w-3 inline mr-1" />
+                    <strong>{allAvatarImages.length} variations de pose disponibles.</strong> Vous pouvez choisir une image différente pour chaque segment ci-dessous.
+                  </p>
+                </div>
+              )}
               <div className="text-xs text-gray-500 space-y-1">
                 <p>• Modèle: Kling AI Avatar (HD)</p>
                 <p>• Durée max par segment: ~15 secondes</p>
@@ -568,44 +605,119 @@ export default function StepFour({
                 {realAudioChunks.map((chunk, idx) => {
                   const isSelected = selectedChunks.has(idx)
                   const existingJob = jobs.find(j => j.audioChunkIndex === idx)
+                  const selectedImage = getImageForChunk(idx)
+                  const hasVariations = allAvatarImages.length > 1
                   
                   return (
                     <div 
                       key={idx} 
-                      className={`flex items-center gap-3 p-3 border rounded-lg transition-all ${
+                      className={`border rounded-lg transition-all ${
                         isSelected ? 'bg-blue-50 border-blue-300' : 'bg-white border-gray-300'
                       }`}
                     >
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => toggleChunkSelection(idx)}
-                        className="w-4 h-4 text-blue-600 rounded"
-                        disabled={!!existingJob}
-                      />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">Segment {idx + 1}</p>
-                        <p className="text-xs text-gray-500 line-clamp-1">{chunk.text.substring(0, 100)}...</p>
-                      </div>
-                      <div className="ml-4">
-                        {existingJob ? (
-                          <div className="text-xs text-gray-500">
-                            {existingJob.status === 'queued' && '⏳ En attente'}
-                            {existingJob.status === 'generating' && '🔄 Génération...'}
-                            {existingJob.status === 'completed' && '✅ Terminé'}
-                            {existingJob.status === 'failed' && '❌ Échec'}
-                          </div>
-                        ) : (
-                          <Button 
-                            size="sm" 
-                            onClick={() => generateVideoForChunk(idx)}
-                            disabled={generatingIndex === idx || loading}
+                      {/* Main row */}
+                      <div className="flex items-center gap-3 p-3">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleChunkSelection(idx)}
+                          className="w-4 h-4 text-blue-600 rounded"
+                          disabled={!!existingJob}
+                        />
+                        
+                        {/* Image thumbnail (clickable if variations available) */}
+                        {hasVariations ? (
+                          <button
+                            type="button"
+                            onClick={() => setShowImageSelector(showImageSelector === idx ? null : idx)}
+                            className="relative w-10 h-10 rounded overflow-hidden border-2 border-orange-300 hover:border-orange-500 transition-colors flex-shrink-0"
+                            title="Changer l'image pour ce segment"
                           >
-                            <Film className="h-4 w-4 mr-1" />
-                            Générer
-                          </Button>
+                            <img src={selectedImage} alt="Avatar" className="w-full h-full object-cover" />
+                            <div className="absolute bottom-0 right-0 bg-orange-500 p-0.5 rounded-tl">
+                              <Images className="h-2.5 w-2.5 text-white" />
+                            </div>
+                          </button>
+                        ) : (
+                          <div className="w-10 h-10 rounded overflow-hidden border border-gray-300 flex-shrink-0">
+                            <img src={selectedImage} alt="Avatar" className="w-full h-full object-cover" />
+                          </div>
                         )}
+                        
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium">Segment {idx + 1}</p>
+                          <p className="text-xs text-gray-500 line-clamp-1">{chunk.text.substring(0, 100)}...</p>
+                        </div>
+                        
+                        <div className="flex items-center gap-2 ml-2">
+                          {hasVariations && (
+                            <button
+                              type="button"
+                              onClick={() => setShowImageSelector(showImageSelector === idx ? null : idx)}
+                              className="text-orange-600 hover:text-orange-700 p-1"
+                              title="Choisir une variation d'image"
+                            >
+                              {showImageSelector === idx ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                            </button>
+                          )}
+                          
+                          {existingJob ? (
+                            <div className="text-xs text-gray-500 whitespace-nowrap">
+                              {existingJob.status === 'queued' && '⏳ En attente'}
+                              {existingJob.status === 'generating' && '🔄 Génération...'}
+                              {existingJob.status === 'completed' && '✅ Terminé'}
+                              {existingJob.status === 'failed' && '❌ Échec'}
+                            </div>
+                          ) : (
+                            <Button 
+                              size="sm" 
+                              onClick={() => generateVideoForChunk(idx)}
+                              disabled={generatingIndex === idx || loading}
+                            >
+                              <Film className="h-4 w-4 mr-1" />
+                              Générer
+                            </Button>
+                          )}
+                        </div>
                       </div>
+                      
+                      {/* Image selector dropdown */}
+                      {showImageSelector === idx && hasVariations && (
+                        <div className="border-t border-gray-200 p-3 bg-orange-50">
+                          <p className="text-xs font-medium text-orange-800 mb-2">
+                            Choisir une image pour ce segment :
+                          </p>
+                          <div className="flex gap-2 flex-wrap">
+                            {allAvatarImages.map((img, imgIdx) => (
+                              <button
+                                key={imgIdx}
+                                type="button"
+                                onClick={() => {
+                                  setImagePerChunk(prev => ({ ...prev, [idx]: img.url }))
+                                  setShowImageSelector(null)
+                                }}
+                                className={`relative w-16 h-16 rounded-lg overflow-hidden border-2 transition-all hover:scale-105 ${
+                                  selectedImage === img.url 
+                                    ? 'border-orange-500 ring-2 ring-orange-300' 
+                                    : 'border-gray-200 hover:border-orange-300'
+                                }`}
+                              >
+                                <img src={img.url} alt={img.label} className="w-full h-full object-cover" />
+                                {selectedImage === img.url && (
+                                  <div className="absolute inset-0 bg-orange-500/20 flex items-center justify-center">
+                                    <div className="bg-orange-500 text-white p-1 rounded-full">
+                                      <Images className="h-3 w-3" />
+                                    </div>
+                                  </div>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                          <p className="text-xs text-orange-600 mt-2">
+                            💡 Utilisez différentes poses pour des transitions naturelles
+                          </p>
+                        </div>
+                      )}
                     </div>
                   )
                 })}

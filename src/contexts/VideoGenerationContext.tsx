@@ -19,7 +19,7 @@ export interface VideoJob {
 
 interface VideoGenerationContextType {
   jobs: VideoJob[]
-  addJob: (audioUrl: string, audioChunkIndex: number, text?: string, section?: string, podcastId?: number) => Promise<string>
+  addJob: (audioUrl: string, audioChunkIndex: number, text?: string, section?: string, podcastId?: number, avatarImageUrl?: string) => Promise<string>
   updateJobStatus: (jobId: string, status: VideoJob['status'], videoUrl?: string, error?: string) => Promise<void>
   clearJobs: (podcastId?: number) => Promise<void>
   refreshJobs: (podcastId?: number) => Promise<void>
@@ -69,7 +69,7 @@ export function VideoGenerationProvider({ children }: { children: React.ReactNod
     refreshJobs()
   }, [])
 
-  const addJob = useCallback(async (audioUrl: string, audioChunkIndex: number, text?: string, section?: string, podcastId?: number): Promise<string> => {
+  const addJob = useCallback(async (audioUrl: string, audioChunkIndex: number, text?: string, section?: string, podcastId?: number, avatarImageUrl?: string): Promise<string> => {
     const jobId = `job-${Date.now()}-${Math.random().toString(36).substring(7)}`
     
     try {
@@ -84,6 +84,7 @@ export function VideoGenerationProvider({ children }: { children: React.ReactNod
       audioUrl,
           text: text || null,
           section: section || null,
+          avatarImageUrl: avatarImageUrl || null, // Image variant for this segment
       status: 'queued',
         }),
       })

@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { id, podcastId, audioChunkIndex, audioUrl, text, section, status = 'queued' } = body
+    const { id, podcastId, audioChunkIndex, audioUrl, text, section, avatarImageUrl, status = 'queued' } = body
 
     if (!id || audioChunkIndex === undefined || !audioUrl) {
       return NextResponse.json(
@@ -72,11 +72,12 @@ export async function POST(request: NextRequest) {
         audioUrl,
         text: text || null,
         section: section || null,
+        avatarImageUrl: avatarImageUrl || null, // Image variant for this segment
         status,
       })
       .returning()
 
-    console.log(`✅ Created video job: ${id}`)
+    console.log(`✅ Created video job: ${id} (image: ${avatarImageUrl || 'default'})`)
     
     return NextResponse.json({ job: newJob })
   } catch (error) {

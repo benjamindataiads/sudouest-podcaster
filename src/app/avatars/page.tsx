@@ -11,13 +11,20 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import SudOuestLogo from '@/components/ui/SudOuestLogo'
-import { Plus, Film, Loader2, Play, Pause, Trash2, Edit2, User, Home, Wand2, Upload, Sparkles, ImageIcon, Mic, Square, Volume2, Camera, Video, Grid3X3, Maximize2, Check, Eye } from 'lucide-react'
+import { Plus, Film, Loader2, Play, Pause, Trash2, Edit2, User, Home, Wand2, Upload, Sparkles, ImageIcon, Mic, Square, Volume2, Camera, Video, Grid3X3, Maximize2, Check, Eye, Shuffle, Images } from 'lucide-react'
+
+interface ImageVariation {
+  url: string
+  label: string
+  description?: string
+}
 
 interface Avatar {
   id: number
   name: string
   voiceUrl: string
   imageUrl: string
+  imageVariations?: ImageVariation[]
   isDefault: boolean
   createdAt: string
   updatedAt: string
@@ -210,11 +217,19 @@ function AvatarCard({
             (e.target as HTMLImageElement).src = 'https://via.placeholder.com/400x400?text=Avatar'
           }}
         />
-        {avatar.isDefault && (
-          <div className="absolute top-3 left-3 px-2 py-1 bg-[#D42E1B] text-white text-xs font-medium rounded">
-            Par défaut
-          </div>
-        )}
+        <div className="absolute top-3 left-3 flex gap-2">
+          {avatar.isDefault && (
+            <div className="px-2 py-1 bg-[#D42E1B] text-white text-xs font-medium rounded">
+              Par défaut
+            </div>
+          )}
+          {avatar.imageVariations && avatar.imageVariations.length > 0 && (
+            <div className="px-2 py-1 bg-orange-500 text-white text-xs font-medium rounded flex items-center gap-1">
+              <Images className="h-3 w-3" />
+              {avatar.imageVariations.length}
+            </div>
+          )}
+        </div>
       </div>
 
       <CardContent className="p-4">
@@ -322,6 +337,11 @@ function AvatarModal({
   // Preview state for generated images
   const [previewMode, setPreviewMode] = useState<'grid' | 'preview'>('grid')
   const [previewImageIndex, setPreviewImageIndex] = useState(0)
+  
+  // Image variations state
+  const [imageVariations, setImageVariations] = useState<ImageVariation[]>([])
+  const [generatingVariations, setGeneratingVariations] = useState(false)
+  const [variationsPreviewIndex, setVariationsPreviewIndex] = useState(0)
 
   const isEditing = !!avatar
   
@@ -336,6 +356,7 @@ De Bordeaux à Biarritz, en passant par Pau et Arcachon, nous allons explorer en
       setName(avatar?.name || '')
       setVoiceUrl(avatar?.voiceUrl || '')
       setImageUrl(avatar?.imageUrl || '')
+      setImageVariations(avatar?.imageVariations || [])
       setError(null)
       setAiPrompt('')
       setAiSourceImages([])
@@ -344,6 +365,8 @@ De Bordeaux à Biarritz, en passant par Pau et Arcachon, nous allons explorer en
       setRecordedUrl(null)
       setRecordingTime(0)
       setIsRecording(false)
+      setGeneratingVariations(false)
+      setVariationsPreviewIndex(0)
     }
     
     // Cleanup on unmount
@@ -601,6 +624,7 @@ De Bordeaux à Biarritz, en passant par Pau et Arcachon, nous allons explorer en
         setVoiceUrl(data.url)
       } else {
         setImageUrl(data.url)
+        setImageVariations([]) // Clear variations when new image is uploaded
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Échec de l\'upload')
@@ -680,7 +704,43 @@ De Bordeaux à Biarritz, en passant par Pau et Arcachon, nous allons explorer en
   // Select AI generated image
   const selectAiImage = (url: string) => {
     setImageUrl(url)
+    setImageVariations([]) // Clear variations when new image is selected
     setActiveTab('upload') // Switch back to upload tab to show the selected image
+  }
+
+  // Generate pose variations from selected image
+  const generatePoseVariations = async () => {
+    if (!imageUrl) {
+      setError('Veuillez d\'abord sélectionner une image')
+      return
+    }
+
+    setGeneratingVariations(true)
+    setError(null)
+
+    try {
+      const response = await fetch('/api/genai/image-variations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sourceImageUrl: imageUrl,
+          resolution: '1K',
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Échec de la génération des variations')
+      }
+
+      setImageVariations(data.images || [])
+      console.log(`✅ Generated ${data.images?.length || 0} pose variations`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Échec de la génération des variations')
+    } finally {
+      setGeneratingVariations(false)
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -701,7 +761,12 @@ De Bordeaux à Biarritz, en passant par Pau et Arcachon, nous allons explorer en
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), voiceUrl: voiceUrl.trim(), imageUrl: imageUrl.trim() }),
+        body: JSON.stringify({ 
+          name: name.trim(), 
+          voiceUrl: voiceUrl.trim(), 
+          imageUrl: imageUrl.trim(),
+          imageVariations: imageVariations.length > 0 ? imageVariations : null,
+        }),
       })
       
       const data = await response.json()
@@ -929,7 +994,10 @@ De Bordeaux à Biarritz, en passant par Pau et Arcachon, nous allons explorer en
                 <div className="flex gap-2">
                   <Input
                     value={imageUrl}
-                    onChange={(e) => setImageUrl(e.target.value)}
+                    onChange={(e) => {
+                      setImageUrl(e.target.value)
+                      setImageVariations([]) // Clear variations when URL changes
+                    }}
                     placeholder="URL de l'image ou uploadez..."
                     className="flex-1"
                     disabled={saving}
@@ -1292,6 +1360,122 @@ De Bordeaux à Biarritz, en passant par Pau et Arcachon, nous allons explorer en
               </TabsContent>
             </Tabs>
           </div>
+
+          {/* Pose Variations Section - appears after image is selected */}
+          {imageUrl && (
+            <div className="space-y-3 p-4 bg-gradient-to-r from-orange-50 to-amber-50 rounded-lg border border-orange-200">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Shuffle className="h-5 w-5 text-orange-600" />
+                  <h4 className="font-semibold text-orange-900">Variations de pose</h4>
+                </div>
+                {imageVariations.length > 0 && (
+                  <span className="text-sm text-orange-600 bg-orange-100 px-2 py-1 rounded-full">
+                    {imageVariations.length} images
+                  </span>
+                )}
+              </div>
+              
+              <p className="text-sm text-orange-700">
+                Générez 4 variations de pose (tête, mains, expression) pour avoir plus de choix lors de la génération vidéo.
+              </p>
+
+              {/* Generate button */}
+              {imageVariations.length === 0 && (
+                <Button
+                  type="button"
+                  onClick={generatePoseVariations}
+                  disabled={generatingVariations || !imageUrl}
+                  className="w-full bg-orange-600 hover:bg-orange-700"
+                >
+                  {generatingVariations ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Génération des variations... (60-90s)
+                    </>
+                  ) : (
+                    <>
+                      <Shuffle className="mr-2 h-4 w-4" />
+                      Générer 4 variations de pose
+                    </>
+                  )}
+                </Button>
+              )}
+
+              {/* Display variations */}
+              {imageVariations.length > 0 && (
+                <div className="space-y-3">
+                  {/* Thumbnails */}
+                  <div className="flex gap-2 justify-center flex-wrap">
+                    {imageVariations.map((variation, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setVariationsPreviewIndex(idx)}
+                        className={`w-20 h-20 rounded-lg overflow-hidden border-2 transition-all ${
+                          variationsPreviewIndex === idx 
+                            ? 'border-orange-500 ring-2 ring-orange-300 scale-105' 
+                            : 'border-gray-200 hover:border-orange-300'
+                        }`}
+                      >
+                        <img 
+                          src={variation.url} 
+                          alt={variation.label} 
+                          className="w-full h-full object-cover"
+                        />
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Preview */}
+                  <div className="bg-white rounded-lg p-3 border border-orange-200">
+                    <div className="flex items-center justify-center mb-2">
+                      <img 
+                        src={imageVariations[variationsPreviewIndex]?.url}
+                        alt="Preview"
+                        className="max-h-[200px] rounded-lg shadow"
+                      />
+                    </div>
+                    <div className="text-center">
+                      <p className="font-medium text-orange-900">
+                        {imageVariations[variationsPreviewIndex]?.label === 'original' 
+                          ? '📷 Image originale' 
+                          : `✨ ${imageVariations[variationsPreviewIndex]?.description || imageVariations[variationsPreviewIndex]?.label}`}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Regenerate button */}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={generatePoseVariations}
+                    disabled={generatingVariations}
+                    className="w-full border-orange-300 text-orange-700 hover:bg-orange-50"
+                  >
+                    {generatingVariations ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Régénération...
+                      </>
+                    ) : (
+                      <>
+                        <Shuffle className="mr-2 h-4 w-4" />
+                        Régénérer les variations
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
+
+              {/* Info about skipping */}
+              {imageVariations.length === 0 && !generatingVariations && (
+                <p className="text-xs text-orange-600 text-center">
+                  💡 Vous pouvez sauter cette étape et créer l'avatar avec une seule image
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Actions */}
           <div className="flex gap-3 pt-4 border-t">

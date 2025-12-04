@@ -185,6 +185,20 @@ export async function GET() {
     `)
     console.log('✅ avatars.image_variations column added/verified')
 
+    // Add avatar_image_url column to video_jobs if it doesn't exist
+    await db.execute(sql`
+      DO $$ 
+      BEGIN 
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'video_jobs' AND column_name = 'avatar_image_url'
+        ) THEN 
+          ALTER TABLE video_jobs ADD COLUMN avatar_image_url TEXT;
+        END IF;
+      END $$;
+    `)
+    console.log('✅ video_jobs.avatar_image_url column added/verified')
+
     return NextResponse.json({
       success: true,
       message: 'All database tables created/verified successfully',

@@ -6,6 +6,7 @@ const nextConfig = {
       bodySizeLimit: '10mb',
     },
     serverComponentsExternalPackages: ['cheerio'],
+    instrumentationHook: true, // Enable instrumentation for auto-migrations
   },
   images: {
     domains: ['www.sudouest.fr', 'public.blob.vercel-storage.com'],

@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import SudOuestLogo from '@/components/ui/SudOuestLogo'
 import CreatePodcastDialog from '@/components/features/CreatePodcastDialog'
 import { Play, Film, Loader2, Plus, Clock, Calendar, Edit2, ChevronDown, ChevronUp, Trash2, User } from 'lucide-react'
+import { SignInButton, SignUpButton, SignedIn, SignedOut, UserButton } from '@clerk/nextjs'
 
 interface Podcast {
   id: number
@@ -110,18 +111,39 @@ export default function HomePage() {
               <h1 className="text-2xl md:text-3xl font-bold">Podcaster</h1>
             </div>
             <div className="flex items-center gap-3">
-              <Link href="/avatars">
-                <Button variant="outline" className="bg-white/10 text-white hover:bg-white/20 border-white/30">
-                  <User className="h-4 w-4 mr-2" />
-                  Avatars
-                </Button>
-              </Link>
-              <Link href="/gallery">
-                <Button variant="outline" className="bg-white text-[#D42E1B] hover:bg-gray-100 border-0">
-                  <Film className="h-4 w-4 mr-2" />
-                  Galerie
-                </Button>
-              </Link>
+              <SignedIn>
+                <Link href="/avatars">
+                  <Button variant="outline" className="bg-white/10 text-white hover:bg-white/20 border-white/30">
+                    <User className="h-4 w-4 mr-2" />
+                    Avatars
+                  </Button>
+                </Link>
+                <Link href="/gallery">
+                  <Button variant="outline" className="bg-white/10 text-white hover:bg-white/20 border-white/30">
+                    <Film className="h-4 w-4 mr-2" />
+                    Galerie
+                  </Button>
+                </Link>
+                <UserButton 
+                  appearance={{
+                    elements: {
+                      avatarBox: "w-10 h-10"
+                    }
+                  }}
+                />
+              </SignedIn>
+              <SignedOut>
+                <SignInButton mode="modal">
+                  <Button variant="outline" className="bg-white/10 text-white hover:bg-white/20 border-white/30">
+                    Connexion
+                  </Button>
+                </SignInButton>
+                <SignUpButton mode="modal">
+                  <Button variant="outline" className="bg-white text-[#D42E1B] hover:bg-gray-100 border-0">
+                    Inscription
+                  </Button>
+                </SignUpButton>
+              </SignedOut>
             </div>
           </div>
         </div>

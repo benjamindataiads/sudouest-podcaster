@@ -12,20 +12,35 @@ export const metadata: Metadata = {
   description: 'Générateur automatique de podcasts audio et vidéo basé sur les articles du journal Sud-Ouest',
 }
 
+// Force dynamic rendering to avoid build-time Clerk key requirement
+export const dynamic = 'force-dynamic'
+
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  // Check if Clerk is configured
+  const clerkKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+  
+  const content = (
+    <html lang="fr">
+      <body className={inter.className}>
+        <Providers>
+          {children}
+        </Providers>
+      </body>
+    </html>
+  )
+
+  // If Clerk is not configured, render without ClerkProvider
+  if (!clerkKey) {
+    return content
+  }
+
   return (
     <ClerkProvider localization={frFR}>
-      <html lang="fr">
-        <body className={inter.className}>
-          <Providers>
-            {children}
-          </Providers>
-        </body>
-      </html>
+      {content}
     </ClerkProvider>
   )
 }

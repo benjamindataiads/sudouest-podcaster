@@ -77,9 +77,9 @@ export async function uploadFromUrl(
   
   await client.send(command)
   
-  // Construct the public URL for Railway storage
-  // Format: https://{bucket-name}.storage.railway.app/{key}
-  const publicUrl = `https://${bucketName}.storage.railway.app/${destinationKey}`
+  // Use proxy URL to serve files with proper CORS
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || ''
+  const publicUrl = `${baseUrl}/api/files/${destinationKey}`
   
   console.log(`✅ Uploaded to bucket: ${publicUrl}`)
   
@@ -132,8 +132,9 @@ export async function uploadFinalPodcastToBucket(
   
   await client.send(command)
   
-  // Railway storage URL format: https://{bucket-name}.storage.railway.app/{key}
-  const publicUrl = `https://${bucketName}.storage.railway.app/${key}`
+  // Use proxy URL to serve files with proper CORS
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || ''
+  const publicUrl = `${baseUrl}/api/files/${key}`
   
   console.log(`✅ Final podcast uploaded: ${publicUrl}`)
   

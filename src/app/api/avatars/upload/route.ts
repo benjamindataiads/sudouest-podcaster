@@ -120,9 +120,10 @@ export async function POST(request: NextRequest) {
       }
     }
     
-    // Construct public URL for Railway storage
-    // Format: https://{bucket-name}.storage.railway.app/{key}
-    const publicUrl = `https://${bucketName}.storage.railway.app/${key}`
+    // Use proxy URL to serve files with proper CORS
+    // Format: /api/files/{key}
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || ''
+    const publicUrl = `${baseUrl}/api/files/${key}`
     
     console.log(`✅ Uploaded avatar ${type}: ${publicUrl}`)
     

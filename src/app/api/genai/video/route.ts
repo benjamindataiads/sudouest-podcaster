@@ -89,11 +89,11 @@ async function handleSingleRequest(body: VideoGenerationRequest) {
   console.log(`🎬 Starting video generation for podcast ${podcastId}, chunk ${audioChunkIndex}`)
   
   // Get avatar image URL from podcast if not provided
-  let finalImageUrl = imageUrl
+  let finalImageUrl: string = imageUrl || ''
   if (!finalImageUrl) {
-    finalImageUrl = await getAvatarImageUrl(podcastId)
+    const avatarImage = await getAvatarImageUrl(podcastId)
+    finalImageUrl = avatarImage || DEFAULT_AVATAR_IMAGE_URL
   }
-  finalImageUrl = finalImageUrl || DEFAULT_AVATAR_IMAGE_URL
   
   console.log(`   Audio: ${audioUrl}`)
   console.log(`   Image: ${finalImageUrl}`)
@@ -158,11 +158,11 @@ async function handleBatchRequest(body: BatchVideoGenerationRequest) {
   console.log(`   Chunks: ${chunks.length}`)
   
   // Get avatar image URL from podcast if not provided
-  let finalImageUrl = imageUrl
+  let finalImageUrl: string = imageUrl || ''
   if (!finalImageUrl) {
-    finalImageUrl = await getAvatarImageUrl(podcastId)
+    const avatarImage = await getAvatarImageUrl(podcastId)
+    finalImageUrl = avatarImage || DEFAULT_AVATAR_IMAGE_URL
   }
-  finalImageUrl = finalImageUrl || DEFAULT_AVATAR_IMAGE_URL
   
   console.log(`   Image: ${finalImageUrl}`)
   

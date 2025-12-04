@@ -53,7 +53,29 @@ export default function StepFour({
   const abortControllerRef = useRef<AbortController | null>(null)
   const audioPollingRef = useRef<NodeJS.Timeout | null>(null)
   
-  const hasMultipleChunks = audioChunks && audioChunks.length > 1
+  // Update realAudioChunks when audioChunks prop changes
+  useEffect(() => {
+    if (audioChunks && audioChunks.length > 0) {
+      console.log(`📥 Received ${audioChunks.length} audio chunks from parent`)
+      setRealAudioChunks(audioChunks)
+      // Check if all chunks have URLs (audio complete)
+      const completedChunks = audioChunks.filter(c => c.url)
+      if (completedChunks.length === audioChunks.length && audioChunks.length > 0) {
+        setAudioGenerating(false)
+      }
+    }
+  }, [audioChunks])
+  
+  // Update audioGenerating state when audioUrl changes
+  useEffect(() => {
+    if (audioUrl && audioUrl !== 'generating') {
+      setAudioGenerating(false)
+    } else if (audioUrl === 'generating') {
+      setAudioGenerating(true)
+    }
+  }, [audioUrl])
+  
+  const hasMultipleChunks = realAudioChunks && realAudioChunks.length > 1
   // Use avatar image from props, or fallback to default
   const avatarImageUrl = avatar?.imageUrl || 'https://dataiads-test1.fr/sudouest/avatarsudsouest.png'
   const avatarName = avatar?.name || 'Avatar Sud-Ouest'
@@ -415,7 +437,10 @@ export default function StepFour({
     )
   }
 
-  const displayAudioChunks = audioGenerating ? audioChunks : realAudioChunks
+  // Use realAudioChunks which is kept in sync with props
+  const displayAudioChunks = realAudioChunks
+  const completedAudioChunks = displayAudioChunks.filter(c => c.url)
+  const totalAudioChunks = displayAudioChunks.length
 
   return (
     <div className="space-y-6">
@@ -465,17 +490,39 @@ export default function StepFour({
         </Card>
       )}
       
+      {/* Banner de génération audio en cours */}
+      {audioGenerating && totalAudioChunks > 0 && (
+        <div className="mb-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+          <div className="flex items-center gap-3">
+            <div className="flex-shrink-0">
+              <Loader2 className="h-6 w-6 animate-spin text-orange-500" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-semibold text-orange-800">🎤 Génération audio en cours...</h3>
+              <p className="text-sm text-orange-600">
+                {completedAudioChunks.length} / {totalAudioChunks} segments terminés
+              </p>
+              <Progress value={(completedAudioChunks.length / totalAudioChunks) * 100} className="mt-2 h-2" />
+            </div>
+          </div>
+        </div>
+      )}
+      
       {/* Aperçu de l'audio */}
       <Card>
         <CardHeader>
           <CardTitle>Audio du podcast</CardTitle>
           <CardDescription>
             {audioGenerating ? (
-              <span className="text-orange-600">⏳ Génération en cours...</span>
-            ) : hasMultipleChunks ? (
-              `${displayAudioChunks.length} segments audio qui seront convertis en vidéo`
-            ) : (
+              <span className="text-orange-600">
+                ⏳ {completedAudioChunks.length}/{totalAudioChunks} segments générés
+              </span>
+            ) : totalAudioChunks > 1 ? (
+              `${completedAudioChunks.length} segments audio prêts pour la vidéo`
+            ) : completedAudioChunks.length > 0 ? (
               'L\'audio qui sera utilisé pour la vidéo'
+            ) : (
+              <span className="text-gray-400">Aucun audio disponible - en attente de génération</span>
             )}
           </CardDescription>
         </CardHeader>
@@ -486,17 +533,23 @@ export default function StepFour({
           )}
           
           {/* Placeholders audio en génération */}
-          {audioGenerating && (
+          {audioGenerating && totalAudioChunks > 0 && (
             <div className="space-y-2 max-h-60 overflow-y-auto">
               {displayAudioChunks.map((chunk, idx) => (
-                <div key={idx} className="p-2 bg-orange-50 rounded flex items-center space-x-3 border border-orange-200">
-                  <span className="text-xs font-medium text-orange-600 min-w-[60px]">
-                    Segment {idx + 1}
+                <div key={idx} className={`p-2 rounded flex items-center space-x-3 border ${
+                  chunk.url ? 'bg-green-50 border-green-200' : 'bg-orange-50 border-orange-200'
+                }`}>
+                  <span className={`text-xs font-medium min-w-[60px] ${chunk.url ? 'text-green-600' : 'text-orange-600'}`}>
+                    {chunk.url ? '✓' : '⏳'} {idx + 1}/{totalAudioChunks}
                   </span>
-                  <div className="flex-1 flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin text-orange-500" />
-                    <span className="text-sm text-gray-600 line-clamp-1">{chunk.text?.substring(0, 80)}...</span>
-                  </div>
+                  {chunk.url ? (
+                    <audio controls src={chunk.url} className="flex-1 h-8" />
+                  ) : (
+                    <div className="flex-1 flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin text-orange-500" />
+                      <span className="text-sm text-gray-600 line-clamp-1">{chunk.text?.substring(0, 60)}...</span>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

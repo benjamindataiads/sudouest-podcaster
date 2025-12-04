@@ -93,10 +93,51 @@ function CreatePodcastPageContent() {
           clearInterval(pollingRef.current)
           pollingRef.current = null
         }
-      } else if (job.audioChunks) {
-        // Partial progress
-        const completed = job.audioChunks.filter((c: AudioChunk) => c.url).length
-        setAudioProgress({ completed, total: job.audioChunks.length })
+      } else if (job.falRequestIds && job.falRequestIds.length > 0) {
+        // Job in progress - merge completed chunks into placeholders
+        const totalChunks = job.falRequestIds.length
+        const completedChunksFromJob = job.audioChunks || []
+        
+        console.log(`📊 Audio progress: ${completedChunksFromJob.length}/${totalChunks} chunks completed`)
+        
+        // Create array with all chunks, filling in completed ones
+        setAudioChunks(prev => {
+          // Start with existing placeholders or create new ones
+          const merged = [...prev]
+          
+          // If we don't have placeholders yet, create them
+          if (merged.length === 0 && job.scriptChunks) {
+            job.scriptChunks.forEach((chunk: { text: string; index: number; section: string; articleTitle?: string }) => {
+              merged[chunk.index] = {
+                url: '',
+                chunkIndex: chunk.index,
+                text: chunk.text,
+                section: chunk.section as 'introduction' | 'article' | 'conclusion',
+                articleTitle: chunk.articleTitle,
+              }
+            })
+          }
+          
+          // Merge in completed chunks by their chunkIndex
+          completedChunksFromJob.forEach((completed: AudioChunk) => {
+            if (completed.chunkIndex !== undefined && completed.url) {
+              merged[completed.chunkIndex] = {
+                ...merged[completed.chunkIndex],
+                ...completed,
+              }
+            }
+          })
+          
+          return merged
+        })
+        
+        // Set first completed chunk as main audio URL
+        const firstCompleted = completedChunksFromJob.find((c: AudioChunk) => c.url)
+        if (firstCompleted) {
+          setAudioUrl(firstCompleted.url)
+        }
+        
+        setAudioProgress({ completed: completedChunksFromJob.length, total: totalChunks })
       }
     } catch (error) {
       console.error('Polling error:', error)
@@ -412,10 +453,15 @@ function CreatePodcastPageContent() {
                 <span className="text-xs bg-white/20 px-3 py-1 rounded-full">
                   Podcast #{podcastId}
                 </span>
-                {audioProgress.total > 0 && audioProgress.completed < audioProgress.total && (
-                  <span className="flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-yellow-500/30 text-yellow-100">
+                {audioJobId && audioProgress.total > 0 && audioProgress.completed < audioProgress.total && (
+                  <span className="flex items-center gap-2 text-xs px-3 py-1 rounded-full bg-orange-500 text-white animate-pulse">
                     <Loader2 className="h-3 w-3 animate-spin" />
-                    Audio {audioProgress.completed}/{audioProgress.total}
+                    🎤 Audio en cours: {audioProgress.completed}/{audioProgress.total}
+                  </span>
+                )}
+                {audioProgress.total > 0 && audioProgress.completed === audioProgress.total && (
+                  <span className="flex items-center gap-1 text-xs px-3 py-1 rounded-full bg-green-500 text-white">
+                    ✓ Audio complet ({audioProgress.total})
                   </span>
                 )}
               </div>

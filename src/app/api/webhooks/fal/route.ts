@@ -164,16 +164,7 @@ async function handleAudioChunkCallback(
 ) {
   console.log(`🎤 Processing audio chunk callback for job: ${job.id}, request: ${requestId}`)
   
-  // Get current audio chunks (or initialize empty array)
   type SectionType = 'introduction' | 'article' | 'conclusion'
-  const currentChunks = (job.audioChunks || []) as Array<{
-    url: string
-    chunkIndex: number
-    text: string
-    section?: SectionType
-    articleTitle?: string
-    requestId?: string
-  }>
   
   // Find the index of this request in the falRequestIds array
   const falRequestIds = (job.falRequestIds || []) as string[]
@@ -208,8 +199,8 @@ async function handleAudioChunkCallback(
       }
     }
     
-    // Add this chunk to the completed chunks
-    const newChunk: typeof currentChunks[number] = {
+    // Create the new chunk
+    const newChunk = {
       url: audioUrl,
       chunkIndex: chunkIndex,
       text: scriptChunk?.text || '',
@@ -218,29 +209,67 @@ async function handleAudioChunkCallback(
       requestId: requestId,
     }
     
-    // Update or add the chunk
-    const existingIndex = currentChunks.findIndex(c => c.chunkIndex === chunkIndex)
-    if (existingIndex >= 0) {
-      currentChunks[existingIndex] = newChunk
-    } else {
-      currentChunks.push(newChunk)
+    // ATOMIC UPDATE: Re-fetch job and update to avoid race conditions
+    // Use a retry loop in case of concurrent updates
+    let retries = 3
+    let updatedChunks: typeof newChunk[] = []
+    let allComplete = false
+    
+    while (retries > 0) {
+      try {
+        // Re-fetch the latest job state
+        const [freshJob] = await db
+          .select()
+          .from(audioJobs)
+          .where(eq(audioJobs.id, job.id))
+          .limit(1)
+        
+        if (!freshJob) {
+          throw new Error('Job not found')
+        }
+        
+        // Get current chunks from fresh data
+        const currentChunks = (freshJob.audioChunks || []) as typeof newChunk[]
+        
+        // Check if this chunk already exists
+        const existingIndex = currentChunks.findIndex(c => c.chunkIndex === chunkIndex)
+        if (existingIndex >= 0) {
+          currentChunks[existingIndex] = newChunk
+        } else {
+          currentChunks.push(newChunk)
+        }
+        
+        // Sort by chunkIndex
+        currentChunks.sort((a, b) => a.chunkIndex - b.chunkIndex)
+        
+        // Check if all chunks are complete
+        allComplete = currentChunks.length === falRequestIds.length
+        updatedChunks = currentChunks
+        
+        // Update with the merged chunks
+        await db
+          .update(audioJobs)
+          .set({
+            audioChunks: currentChunks,
+            status: allComplete ? 'completed' : 'generating',
+            completedAt: allComplete ? new Date() : null,
+            updatedAt: new Date(),
+          })
+          .where(eq(audioJobs.id, job.id))
+        
+        break // Success, exit retry loop
+        
+      } catch (err) {
+        retries--
+        console.warn(`⚠️ Retry ${3 - retries}/3 for chunk ${chunkIndex}:`, err)
+        if (retries === 0) throw err
+        // Small delay before retry
+        await new Promise(resolve => setTimeout(resolve, 100))
+      }
     }
     
-    // Sort by chunkIndex
-    currentChunks.sort((a, b) => a.chunkIndex - b.chunkIndex)
-    
-    // Check if all chunks are complete
-    const allComplete = currentChunks.length === falRequestIds.length
-    
-    await db
-      .update(audioJobs)
-      .set({
-        audioChunks: currentChunks,
-        status: allComplete ? 'completed' : 'generating',
-        completedAt: allComplete ? new Date() : null,
-        updatedAt: new Date(),
-      })
-      .where(eq(audioJobs.id, job.id))
+    // Use the final updated chunks
+    const currentChunks = updatedChunks
     
     console.log(`✅ Audio chunk ${chunkIndex + 1}/${falRequestIds.length} completed for job ${job.id}`)
     

@@ -136,7 +136,9 @@ export async function uploadFinalPodcastToBucket(
   
   const client = getS3Client()
   const bucketName = getBucketName()
-  const key = `podcasts/${podcastId}/final.mp4`
+  // Add timestamp to filename to bust CDN/browser cache
+  const timestamp = Date.now()
+  const key = `podcasts/${podcastId}/final-${timestamp}.mp4`
   
   const command = new PutObjectCommand({
     Bucket: bucketName,
@@ -147,7 +149,7 @@ export async function uploadFinalPodcastToBucket(
   
   await client.send(command)
   
-  // Return public URL
+  // Return public URL with cache-busting query param
   const publicUrl = getPublicUrl(key)
   
   console.log(`✅ Final podcast uploaded: ${publicUrl}`)

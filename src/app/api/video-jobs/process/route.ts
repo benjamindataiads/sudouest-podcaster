@@ -38,28 +38,33 @@ export async function POST() {
         .where(eq(podcasts.id, jobToProcess.podcastId))
         .limit(1)
       
-      console.log(`📋 Podcast found: ${podcast ? 'yes' : 'no'}`)
-      console.log(`   Podcast avatarId: ${podcast?.avatarId || 'null'}`)
+      console.log(`📋 Podcast query result:`, JSON.stringify(podcast, null, 2))
       
       if (podcast?.avatarId) {
+        console.log(`🔍 Looking for avatar with ID: ${podcast.avatarId}`)
+        
         const [avatar] = await db
           .select()
           .from(avatars)
           .where(eq(avatars.id, podcast.avatarId))
           .limit(1)
         
-        console.log(`🎭 Avatar found: ${avatar ? avatar.name : 'no'}`)
+        console.log(`🎭 Avatar query result:`, JSON.stringify(avatar, null, 2))
         
-        if (avatar) {
+        if (avatar && avatar.imageUrl) {
           avatarImageUrl = avatar.imageUrl
-          console.log(`🎭 Using avatar image: ${avatar.name} (${avatarImageUrl})`)
+          console.log(`✅ Using custom avatar image: ${avatar.name} => ${avatarImageUrl}`)
+        } else {
+          console.log(`⚠️ Avatar found but no imageUrl, will use default`)
         }
       } else {
-        console.log(`⚠️ No avatarId on podcast, will use default image`)
+        console.log(`⚠️ No avatarId on podcast (avatarId: ${podcast?.avatarId}), will use default image`)
       }
     } else {
       console.log(`⚠️ No podcastId on job, will use default image`)
     }
+    
+    console.log(`🎯 Final avatarImageUrl: ${avatarImageUrl || 'undefined (will use default)'}`)
 
     try {
       // 2. Submit to fal.ai with webhook (non-blocking)

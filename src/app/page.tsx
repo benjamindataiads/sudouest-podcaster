@@ -81,15 +81,30 @@ export default function HomePage() {
 
   const getStatusLabel = (status: string) => {
     const labels: Record<string, string> = {
-      draft: 'Brouillon',
-      articles_selected: 'Articles sélectionnés',
-      script_ready: 'Script prêt',
-      audio_generated: 'Audio généré',
-      video_generating: 'Vidéo en cours',
-      video_generated: 'Vidéo générée',
+      draft: '1. Articles',
+      articles_selected: '2. Script',
+      script_ready: '3. Audio',
+      audio_generating: '3. Audio en cours...',
+      audio_generated: '4. Vidéo',
+      video_generating: '4. Vidéo en cours...',
+      video_generated: 'Terminé',
       completed: 'Terminé',
     }
     return labels[status] || status
+  }
+  
+  const getStepNumber = (status: string): number => {
+    const steps: Record<string, number> = {
+      draft: 1,
+      articles_selected: 2,
+      script_ready: 3,
+      audio_generating: 3,
+      audio_generated: 4,
+      video_generating: 4,
+      video_generated: 4,
+      completed: 4,
+    }
+    return steps[status] || 1
   }
 
   const getStatusColor = (status: string) => {
@@ -224,9 +239,25 @@ export default function HomePage() {
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(podcast.status)}`}>
-                            {getStatusLabel(podcast.status)}
-                          </span>
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-1">
+                              {[1, 2, 3, 4].map((step) => (
+                                <div
+                                  key={step}
+                                  className={`w-2 h-2 rounded-full ${
+                                    step <= getStepNumber(podcast.status)
+                                      ? podcast.status.includes('generating') && step === getStepNumber(podcast.status)
+                                        ? 'bg-yellow-500 animate-pulse'
+                                        : 'bg-green-500'
+                                      : 'bg-gray-200'
+                                  }`}
+                                />
+                              ))}
+                            </div>
+                            <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(podcast.status)}`}>
+                              {getStatusLabel(podcast.status)}
+                            </span>
+                          </div>
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-600 hidden md:table-cell">
                           {new Date(podcast.createdAt).toLocaleDateString('fr-FR', {
@@ -279,7 +310,7 @@ export default function HomePage() {
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex items-center justify-end gap-2">
-                            <Link href={`/create?resume=${podcast.id}`}>
+                            <Link href={`/create?resume=${podcast.id}&step=${getStepNumber(podcast.status)}`}>
                               <Button size="sm" variant="outline">
                                 {podcast.status === 'completed' ? 'Voir' : 'Reprendre'}
                               </Button>

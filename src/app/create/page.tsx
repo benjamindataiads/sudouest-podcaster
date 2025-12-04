@@ -2,8 +2,8 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useState, useEffect, Suspense, useCallback } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useState, useEffect, Suspense, useCallback, useRef } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
@@ -14,8 +14,7 @@ import StepThree from '@/components/features/StepThree'
 import StepFour from '@/components/features/StepFour'
 import { ArticleWithScore, PodcastScript } from '@/types'
 import { AudioChunk } from '@/lib/genai/types'
-import { useGenAIStream } from '@/hooks/useGenAIStream'
-import { Loader2, FileText, Video, Newspaper, CheckCircle2, Home, Mic, Film, Wifi, WifiOff } from 'lucide-react'
+import { Loader2, FileText, Video, Newspaper, CheckCircle2, Home, Mic, Film } from 'lucide-react'
 
 interface Avatar {
   id: number
@@ -25,12 +24,16 @@ interface Avatar {
   isDefault: boolean
 }
 
+type StepType = '1' | '2' | '3' | '4'
+
 function CreatePodcastPageContent() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const resumeId = searchParams.get('resume')
+  const stepParam = searchParams.get('step') as StepType | null
 
   const [podcastId, setPodcastId] = useState<number | null>(null)
-  const [currentStep, setCurrentStep] = useState<'1' | '2' | '3' | '4'>('1')
+  const [currentStep, setCurrentStepState] = useState<StepType>('1')
   const [selectedArticles, setSelectedArticles] = useState<ArticleWithScore[]>([])
   const [script, setScript] = useState<PodcastScript | null>(null)
   const [audioUrl, setAudioUrl] = useState<string>('')
@@ -38,45 +41,84 @@ function CreatePodcastPageContent() {
   const [loadingResume, setLoadingResume] = useState(false)
   const [avatar, setAvatar] = useState<Avatar | null>(null)
   const [audioProgress, setAudioProgress] = useState<{ completed: number; total: number }>({ completed: 0, total: 0 })
+  const [audioJobId, setAudioJobId] = useState<string | null>(null)
+  const pollingRef = useRef<NodeJS.Timeout | null>(null)
 
-  // SSE callbacks for real-time updates
-  const handleAudioChunkComplete = useCallback((chunkIndex: number, chunkUrl: string, totalChunks: number) => {
-    console.log(`🎤 Audio chunk ${chunkIndex + 1}/${totalChunks} received via SSE`)
-    setAudioChunks(prev => {
-      const updated = [...prev]
-      if (updated[chunkIndex]) {
-        updated[chunkIndex] = { ...updated[chunkIndex], url: chunkUrl }
+  // Update URL when changing step
+  const setCurrentStep = useCallback((step: StepType) => {
+    setCurrentStepState(step)
+    if (podcastId) {
+      const url = `/create?resume=${podcastId}&step=${step}`
+      window.history.replaceState({}, '', url)
+    }
+  }, [podcastId])
+
+  // Simple polling for audio job status
+  const pollAudioJob = useCallback(async (jobId: string) => {
+    try {
+      const response = await fetch(`/api/genai/audio?jobId=${jobId}`)
+      if (!response.ok) return
+      
+      const data = await response.json()
+      const job = data.job
+      
+      console.log(`📊 Audio job status: ${job.status}`)
+      
+      if (job.status === 'completed' && job.audioChunks) {
+        console.log('🎉 Audio generation complete!')
+        setAudioChunks(job.audioChunks)
+        setAudioUrl(job.audioChunks[0]?.url || '')
+        setAudioProgress({ completed: job.audioChunks.length, total: job.audioChunks.length })
+        
+        // Stop polling
+        if (pollingRef.current) {
+          clearInterval(pollingRef.current)
+          pollingRef.current = null
+        }
+        
+        // Update podcast in DB
+        await fetch('/api/podcasts/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: podcastId,
+            audioChunks: job.audioChunks,
+            status: 'audio_generated',
+          }),
+        })
+      } else if (job.status === 'failed') {
+        console.error('❌ Audio generation failed:', job.error)
+        alert(`Erreur audio: ${job.error}`)
+        if (pollingRef.current) {
+          clearInterval(pollingRef.current)
+          pollingRef.current = null
+        }
+      } else if (job.audioChunks) {
+        // Partial progress
+        const completed = job.audioChunks.filter((c: AudioChunk) => c.url).length
+        setAudioProgress({ completed, total: job.audioChunks.length })
       }
-      return updated
-    })
-    setAudioProgress({ completed: chunkIndex + 1, total: totalChunks })
-  }, [])
+    } catch (error) {
+      console.error('Polling error:', error)
+    }
+  }, [podcastId])
 
-  const handleAllAudioComplete = useCallback((chunks: AudioChunk[]) => {
-    console.log('🎉 All audio complete via SSE!')
-    setAudioChunks(chunks)
-    setAudioUrl(chunks[0]?.url || '')
-    setAudioProgress({ completed: chunks.length, total: chunks.length })
-  }, [])
-
-  const handleVideoComplete = useCallback((videoUrl: string) => {
-    console.log('🎬 Video complete via SSE:', videoUrl)
-    // Video updates handled by StepFour
-  }, [])
-
-  const handleGenAIError = useCallback((jobType: string, error: string) => {
-    console.error(`❌ ${jobType} error via SSE:`, error)
-    alert(`Erreur de génération ${jobType}: ${error}`)
-  }, [])
-
-  // Connect to SSE stream for real-time updates
-  const { connected: sseConnected } = useGenAIStream({
-    podcastId,
-    onAudioChunkComplete: handleAudioChunkComplete,
-    onAllAudioComplete: handleAllAudioComplete,
-    onVideoComplete: handleVideoComplete,
-    onError: handleGenAIError,
-  })
+  // Start polling when audioJobId is set
+  useEffect(() => {
+    if (audioJobId) {
+      console.log(`🔄 Starting audio job polling for ${audioJobId}`)
+      // Poll every 3 seconds
+      pollingRef.current = setInterval(() => pollAudioJob(audioJobId), 3000)
+      // Initial poll
+      pollAudioJob(audioJobId)
+    }
+    
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current)
+      }
+    }
+  }, [audioJobId, pollAudioJob])
 
   // Load podcast if resuming
   useEffect(() => {
@@ -99,12 +141,6 @@ function CreatePodcastPageContent() {
         setPodcastId(podcast.id)
         if (podcast.selectedArticles) setSelectedArticles(podcast.selectedArticles)
         if (podcast.script) setScript(podcast.script)
-        if (podcast.audioChunks) {
-          setAudioChunks(podcast.audioChunks)
-          if (podcast.audioChunks.length > 0) {
-            setAudioUrl(podcast.audioChunks[0].url)
-          }
-        }
         
         // Load avatar from response
         if (data.avatar) {
@@ -112,17 +148,88 @@ function CreatePodcastPageContent() {
           console.log('✅ Avatar loaded:', data.avatar.name)
         }
         
-        // Set current step based on podcast status
-        const stepMap: Record<string, '1' | '2' | '3' | '4'> = {
-          draft: '1',
-          articles_selected: '2',
-          script_ready: '3',
-          audio_generated: '4',
-          video_generating: '4',
-          video_generated: '4',
-          completed: '4',
+        // Check for audio - either from podcast or from audio job
+        let hasAudio = false
+        if (podcast.audioChunks && podcast.audioChunks.length > 0 && podcast.audioChunks[0].url) {
+          setAudioChunks(podcast.audioChunks)
+          setAudioUrl(podcast.audioChunks[0].url)
+          setAudioProgress({ completed: podcast.audioChunks.length, total: podcast.audioChunks.length })
+          hasAudio = true
+          console.log('✅ Audio loaded from podcast:', podcast.audioChunks.length, 'chunks')
         }
-        setCurrentStep(stepMap[podcast.status] || '1')
+        
+        // Check for pending/generating audio job
+        if (!hasAudio) {
+          try {
+            const audioJobsResponse = await fetch(`/api/genai/audio?podcastId=${id}`)
+            if (audioJobsResponse.ok) {
+              const audioData = await audioJobsResponse.json()
+              const jobs = audioData.jobs || []
+              
+              // Find the most recent job
+              const latestJob = jobs.sort((a: { createdAt: string }, b: { createdAt: string }) => 
+                new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+              )[0]
+              
+              if (latestJob) {
+                console.log('📋 Found audio job:', latestJob.id, 'status:', latestJob.status)
+                
+                if (latestJob.status === 'completed' && latestJob.audioChunks) {
+                  // Job is done, load audio
+                  setAudioChunks(latestJob.audioChunks)
+                  setAudioUrl(latestJob.audioChunks[0]?.url || '')
+                  setAudioProgress({ completed: latestJob.audioChunks.length, total: latestJob.audioChunks.length })
+                  hasAudio = true
+                  console.log('✅ Audio loaded from completed job')
+                } else if (latestJob.status === 'generating' || latestJob.status === 'queued') {
+                  // Job in progress, start polling
+                  console.log('🔄 Audio job in progress, starting polling...')
+                  setAudioJobId(latestJob.id)
+                  
+                  // Set up placeholders from script chunks
+                  if (podcast.script?.chunks) {
+                    const placeholders = podcast.script.chunks.map((chunk: { text: string; section: string; articleTitle?: string }, idx: number) => ({
+                      url: '',
+                      chunkIndex: idx,
+                      text: chunk.text,
+                      section: chunk.section,
+                      articleTitle: chunk.articleTitle,
+                    }))
+                    setAudioChunks(placeholders as AudioChunk[])
+                    setAudioProgress({ completed: 0, total: placeholders.length })
+                  }
+                }
+              }
+            }
+          } catch (e) {
+            console.error('Error checking audio jobs:', e)
+          }
+        }
+        
+        // Determine current step based on URL param or podcast status
+        let step: StepType = '1'
+        
+        // If stepParam is provided in URL and valid, use it
+        if (stepParam && ['1', '2', '3', '4'].includes(stepParam)) {
+          step = stepParam
+          console.log('📍 Using step from URL:', step)
+        } else {
+          // Otherwise determine from status
+          if (podcast.status === 'draft') {
+            step = '1'
+          } else if (podcast.status === 'articles_selected') {
+            step = '2'
+          } else if (podcast.status === 'script_ready' || podcast.status === 'audio_generating') {
+            step = '3'
+          } else if (hasAudio || podcast.status === 'audio_generated' || podcast.status.includes('video') || podcast.status === 'completed') {
+            step = '4'
+          }
+          console.log('📍 Setting step to:', step, 'based on status:', podcast.status)
+        }
+        
+        setCurrentStepState(step)
+        // Update URL
+        window.history.replaceState({}, '', `/create?resume=${id}&step=${step}`)
       }
     } catch (error) {
       console.error('Error loading podcast:', error)
@@ -224,7 +331,7 @@ function CreatePodcastPageContent() {
         body: JSON.stringify({
           podcastId: podcastId,
           scriptChunks: generatedScript.chunks || [],
-          voiceUrl: avatar?.voiceUrl, // Will use avatar from podcast if not provided
+          voiceUrl: avatar?.voiceUrl,
         }),
       })
 
@@ -235,16 +342,17 @@ function CreatePodcastPageContent() {
 
       const result = await response.json()
       console.log(`✅ Audio generation started: ${result.jobId}`)
-      console.log(`   Chunks submitted: ${result.chunksSubmitted}`)
-      console.log(`   SSE updates will arrive automatically`)
+      
+      // Start polling for audio job status
+      setAudioJobId(result.jobId)
 
     } catch (error) {
       console.error('❌ Failed to start audio generation:', error)
       alert(`Erreur: ${error instanceof Error ? error.message : 'Impossible de démarrer la génération audio'}`)
     }
 
-    // Passer directement à l'étape Vidéo
-    setCurrentStep('4')
+    // Rester sur l'étape 3 (audio) pour voir la progression
+    setCurrentStep('3')
   }
 
   const handleStep3Complete = async (audio: string, chunks?: AudioChunk[]) => {
@@ -302,14 +410,14 @@ function CreatePodcastPageContent() {
             {podcastId && (
               <div className="flex items-center gap-2">
                 <span className="text-xs bg-white/20 px-3 py-1 rounded-full">
-                  ID: #{podcastId}
+                  Podcast #{podcastId}
                 </span>
-                <span className={`flex items-center gap-1 text-xs px-2 py-1 rounded-full ${
-                  sseConnected ? 'bg-green-500/30 text-green-100' : 'bg-yellow-500/30 text-yellow-100'
-                }`}>
-                  {sseConnected ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
-                  {sseConnected ? 'Live' : 'Reconnecting...'}
-                </span>
+                {audioProgress.total > 0 && audioProgress.completed < audioProgress.total && (
+                  <span className="flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-yellow-500/30 text-yellow-100">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Audio {audioProgress.completed}/{audioProgress.total}
+                  </span>
+                )}
               </div>
             )}
           </div>

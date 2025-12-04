@@ -56,7 +56,7 @@ export async function submitAvatarVideo(input: VideoGenerationInput): Promise<{ 
   const falInput: AvatarVideoInput = {
     audio_url: input.audioUrl,
     image_url: imageUrl,
-    prompt: '.', // Required but not used for lip-sync
+    prompt: 'Animate only the person for lip sync. Keep all logos, text, and background elements completely static and unchanged. Natural subtle hand movements while speaking. Do not add, remove, or animate any logos or graphics. Preserve the original image composition.',
   }
   
   console.log(`🎬 Submitting avatar video:`)

@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import SudOuestLogo from '@/components/ui/SudOuestLogo'
-import { Plus, Film, Loader2, Play, Pause, Trash2, Edit2, User, Home, Wand2, Upload, Sparkles, ImageIcon, Mic, Square, Volume2 } from 'lucide-react'
+import { Plus, Film, Loader2, Play, Pause, Trash2, Edit2, User, Home, Wand2, Upload, Sparkles, ImageIcon, Mic, Square, Volume2, Camera, Video } from 'lucide-react'
 
 interface Avatar {
   id: number
@@ -310,6 +310,13 @@ function AvatarModal({
   const [aiResolution, setAiResolution] = useState<'1K' | '2K' | '4K'>('1K')
   const [aiGenerating, setAiGenerating] = useState(false)
   const [aiGeneratedImages, setAiGeneratedImages] = useState<Array<{ url: string; width?: number; height?: number }>>([])
+  
+  // Webcam state
+  const [showWebcam, setShowWebcam] = useState(false)
+  const [webcamReady, setWebcamReady] = useState(false)
+  const videoRef = useRef<HTMLVideoElement | null>(null)
+  const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const streamRef = useRef<MediaStream | null>(null)
 
   const isEditing = !!avatar
   
@@ -463,6 +470,92 @@ De Bordeaux à Biarritz, en passant par Pau et Arcachon, nous allons explorer en
     const mins = Math.floor(seconds / 60)
     const secs = seconds % 60
     return `${mins}:${secs.toString().padStart(2, '0')}`
+  }
+
+  // Start webcam
+  const startWebcam = async () => {
+    try {
+      setError(null)
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { width: 1280, height: 720, facingMode: 'user' } 
+      })
+      streamRef.current = stream
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream
+        videoRef.current.onloadedmetadata = () => {
+          setWebcamReady(true)
+        }
+      }
+      setShowWebcam(true)
+    } catch (err) {
+      setError('Impossible d\'accéder à la webcam: ' + (err instanceof Error ? err.message : String(err)))
+    }
+  }
+
+  // Stop webcam
+  const stopWebcam = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop())
+      streamRef.current = null
+    }
+    setShowWebcam(false)
+    setWebcamReady(false)
+  }
+
+  // Capture photo from webcam
+  const capturePhoto = async () => {
+    if (!videoRef.current || !canvasRef.current || !webcamReady) return
+    
+    setUploading(true)
+    setError(null)
+    
+    try {
+      const video = videoRef.current
+      const canvas = canvasRef.current
+      canvas.width = video.videoWidth
+      canvas.height = video.videoHeight
+      
+      const ctx = canvas.getContext('2d')
+      if (!ctx) throw new Error('Cannot get canvas context')
+      
+      // Flip horizontally for mirror effect
+      ctx.translate(canvas.width, 0)
+      ctx.scale(-1, 1)
+      ctx.drawImage(video, 0, 0)
+      
+      // Convert to blob
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob(
+          (b) => b ? resolve(b) : reject(new Error('Failed to create blob')),
+          'image/jpeg',
+          0.9
+        )
+      })
+      
+      // Upload to R2
+      const formData = new FormData()
+      formData.append('file', blob, `webcam-${Date.now()}.jpg`)
+      formData.append('type', 'image')
+      
+      const response = await fetch('/api/avatars/upload', {
+        method: 'POST',
+        body: formData,
+      })
+      
+      const data = await response.json()
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Échec de l\'upload')
+      }
+      
+      // Add to AI source images
+      setAiSourceImages(prev => [...prev, data.url])
+      stopWebcam()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Échec de la capture')
+    } finally {
+      setUploading(false)
+    }
   }
 
   const handleFileUpload = async (file: File, type: 'voice' | 'image') => {
@@ -883,8 +976,10 @@ De Bordeaux à Biarritz, en passant par Pau et Arcachon, nous allons explorer en
                           </button>
                         </div>
                       ))}
-                      <label className="w-16 h-16 rounded-lg border-2 border-dashed border-purple-300 flex items-center justify-center cursor-pointer hover:border-purple-500 hover:bg-purple-50 transition-colors">
-                        <Plus className="h-6 w-6 text-purple-400" />
+                      {/* Upload button */}
+                      <label className="w-16 h-16 rounded-lg border-2 border-dashed border-purple-300 flex flex-col items-center justify-center cursor-pointer hover:border-purple-500 hover:bg-purple-50 transition-colors">
+                        <Upload className="h-5 w-5 text-purple-400" />
+                        <span className="text-[10px] text-purple-400">Fichier</span>
                         <input
                           type="file"
                           accept="image/*"
@@ -896,11 +991,74 @@ De Bordeaux à Biarritz, en passant par Pau et Arcachon, nous allons explorer en
                           }}
                         />
                       </label>
+                      {/* Webcam button */}
+                      <button
+                        type="button"
+                        onClick={startWebcam}
+                        disabled={uploading || showWebcam}
+                        className="w-16 h-16 rounded-lg border-2 border-dashed border-purple-300 flex flex-col items-center justify-center cursor-pointer hover:border-purple-500 hover:bg-purple-50 transition-colors disabled:opacity-50"
+                      >
+                        <Camera className="h-5 w-5 text-purple-400" />
+                        <span className="text-[10px] text-purple-400">Webcam</span>
+                      </button>
                     </div>
                     <p className="text-xs text-purple-600">
-                      Ajoutez des photos de la personne pour créer un avatar ressemblant
+                      Ajoutez des photos (fichier ou webcam) de la personne pour créer un avatar ressemblant
                     </p>
                   </div>
+
+                  {/* Webcam capture */}
+                  {showWebcam && (
+                    <div className="mb-4 p-4 bg-white rounded-lg border border-purple-300">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <Video className="h-5 w-5 text-purple-600" />
+                          <span className="font-medium text-purple-900">Capture webcam</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={stopWebcam}
+                          className="text-gray-500 hover:text-gray-700"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                      <div className="relative aspect-video bg-black rounded-lg overflow-hidden mb-3">
+                        <video
+                          ref={videoRef}
+                          autoPlay
+                          playsInline
+                          muted
+                          className="w-full h-full object-cover"
+                          style={{ transform: 'scaleX(-1)' }}
+                        />
+                        <canvas ref={canvasRef} className="hidden" />
+                        {!webcamReady && (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <Loader2 className="h-8 w-8 animate-spin text-white" />
+                          </div>
+                        )}
+                      </div>
+                      <Button
+                        type="button"
+                        onClick={capturePhoto}
+                        disabled={!webcamReady || uploading}
+                        className="w-full bg-purple-600 hover:bg-purple-700"
+                      >
+                        {uploading ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Upload en cours...
+                          </>
+                        ) : (
+                          <>
+                            <Camera className="mr-2 h-4 w-4" />
+                            Prendre la photo
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  )}
 
                   {/* Prompt */}
                   <div className="space-y-2 mb-4">

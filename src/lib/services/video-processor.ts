@@ -147,10 +147,27 @@ export async function generateThumbnail(
 }
 
 /**
- * Concatène plusieurs vidéos en une seule
- * Télécharge les vidéos depuis leurs URLs, les concatène, puis retourne le chemin local
+ * Get video duration using ffprobe
  */
-export async function concatenateVideos(videoUrls: string[]): Promise<string> {
+async function getVideoDurationFromFile(filePath: string): Promise<number> {
+  return new Promise((resolve, reject) => {
+    ffmpeg.ffprobe(filePath, (err, metadata) => {
+      if (err) {
+        reject(err)
+        return
+      }
+      const duration = metadata.format.duration || 0
+      resolve(duration)
+    })
+  })
+}
+
+/**
+ * Concatène plusieurs vidéos en une seule avec transitions fondu blanc
+ * La dernière frame de chaque vidéo et la première frame de la suivante sont utilisées
+ * pour créer une transition de 1 seconde (fondu blanc)
+ */
+export async function concatenateVideos(videoUrls: string[], withTransition: boolean = true): Promise<string> {
   if (videoUrls.length === 0) {
     throw new Error('No videos to concatenate')
   }
@@ -165,12 +182,15 @@ export async function concatenateVideos(videoUrls: string[]): Promise<string> {
   const tempDir = path.join(process.cwd(), 'public', 'temp')
   await fs.mkdir(tempDir, { recursive: true })
 
+  const TRANSITION_DURATION = 1 // 1 seconde de transition
+
   // Télécharger et NORMALISER toutes les vidéos une par une
   console.log(`Downloading and normalizing ${videoUrls.length} videos...`)
   const normalizedPaths: string[] = []
+  const videoDurations: number[] = []
 
   for (let i = 0; i < videoUrls.length; i++) {
-    let videoUrl = videoUrls[i]
+    const videoUrl = videoUrls[i]
     const downloadPath = path.join(tempDir, `download-${i}.mp4`)
     const normalizedPath = path.join(tempDir, `normalized-${i}.mp4`)
     
@@ -216,15 +236,15 @@ export async function concatenateVideos(videoUrls: string[]): Promise<string> {
         .run()
     })
     
+    // Get video duration for transition calculations
+    const duration = await getVideoDurationFromFile(normalizedPath)
+    videoDurations.push(duration)
+    console.log(`   Duration: ${duration.toFixed(2)}s`)
+    
     normalizedPaths.push(normalizedPath)
     // Supprimer le fichier téléchargé
     await fs.unlink(downloadPath).catch(() => {})
   }
-
-  // Créer un fichier de liste pour concat
-  const listPath = path.join(tempDir, 'filelist.txt')
-  const listContent = normalizedPaths.map(p => `file '${p}'`).join('\n')
-  await fs.writeFile(listPath, listContent)
 
   const outputPath = path.join(
     process.cwd(),
@@ -233,45 +253,140 @@ export async function concatenateVideos(videoUrls: string[]): Promise<string> {
     `concatenated-${Date.now()}.mp4`
   )
 
-  return new Promise((resolve, reject) => {
-    console.log('Concatenating normalized videos (simple copy)...')
+  // If only 2 videos or transitions disabled, use simple xfade
+  if (!withTransition || normalizedPaths.length === 2) {
+    return concatenateWithTransitions(normalizedPaths, videoDurations, outputPath, tempDir, TRANSITION_DURATION, withTransition)
+  }
+
+  // For multiple videos, chain xfade filters
+  return concatenateWithTransitions(normalizedPaths, videoDurations, outputPath, tempDir, TRANSITION_DURATION, withTransition)
+}
+
+/**
+ * Concatenate videos with white fade transitions between them
+ */
+async function concatenateWithTransitions(
+  videoPaths: string[],
+  durations: number[],
+  outputPath: string,
+  tempDir: string,
+  transitionDuration: number,
+  withTransition: boolean
+): Promise<string> {
+  if (!withTransition) {
+    // Simple concat without transitions
+    const listPath = path.join(tempDir, 'filelist.txt')
+    const listContent = videoPaths.map(p => `file '${p}'`).join('\n')
+    await fs.writeFile(listPath, listContent)
+
+    return new Promise((resolve, reject) => {
+      ffmpeg()
+        .input(listPath)
+        .inputOptions(['-f', 'concat', '-safe', '0'])
+        .outputOptions(['-c', 'copy', '-movflags', '+faststart'])
+        .output(outputPath)
+        .on('end', async () => {
+          await cleanupFiles(videoPaths, [listPath])
+          resolve(outputPath)
+        })
+        .on('error', reject)
+        .run()
+    })
+  }
+
+  console.log(`🎬 Concatenating ${videoPaths.length} videos with white fade transitions...`)
+
+  // Build complex filter for xfade transitions
+  // xfade with fadewhite transition keeps last frame of video A and first frame of video B
+  // and creates a smooth white fade between them
+  
+  let filterComplex = ''
+  let currentVideoStream = '[0:v]'
+  let currentAudioStream = '[0:a]'
+  let offset = durations[0] - transitionDuration
+
+  for (let i = 1; i < videoPaths.length; i++) {
+    const outVideoLabel = i === videoPaths.length - 1 ? '[outv]' : `[v${i}]`
+    const outAudioLabel = i === videoPaths.length - 1 ? '[outa]' : `[a${i}]`
     
-    ffmpeg()
-      .input(listPath)
-      .inputOptions(['-f', 'concat', '-safe', '0'])
+    // Video: xfade with fadewhite (white flash transition)
+    filterComplex += `${currentVideoStream}[${i}:v]xfade=transition=fadewhite:duration=${transitionDuration}:offset=${offset.toFixed(3)}${outVideoLabel};`
+    
+    // Audio: acrossfade
+    filterComplex += `${currentAudioStream}[${i}:a]acrossfade=d=${transitionDuration}${outAudioLabel};`
+    
+    currentVideoStream = outVideoLabel
+    currentAudioStream = outAudioLabel
+    
+    // Update offset for next transition
+    // offset = cumulative_duration - (number_of_transitions * transition_duration)
+    if (i < videoPaths.length - 1) {
+      offset += durations[i] - transitionDuration
+    }
+  }
+
+  // Remove trailing semicolon
+  filterComplex = filterComplex.slice(0, -1)
+
+  return new Promise((resolve, reject) => {
+    let command = ffmpeg()
+    
+    // Add all video inputs
+    for (const videoPath of videoPaths) {
+      command = command.input(videoPath)
+    }
+    
+    command
+      .complexFilter(filterComplex)
       .outputOptions([
-        '-c', 'copy',             // Maintenant on peut copier car tout est normalisé!
+        '-map', '[outv]',
+        '-map', '[outa]',
+        '-c:v', 'libx264',
+        '-preset', 'fast',
+        '-crf', '23',
+        '-c:a', 'aac',
+        '-b:a', '128k',
         '-movflags', '+faststart',
       ])
       .output(outputPath)
       .on('start', (commandLine) => {
-        console.log('FFmpeg concat command:', commandLine)
+        console.log('FFmpeg xfade command:', commandLine)
       })
       .on('progress', (progress) => {
-        console.log(`Concatenating: ${progress.percent?.toFixed(2)}% done`)
+        console.log(`Processing transitions: ${progress.percent?.toFixed(2)}% done`)
       })
       .on('end', async () => {
-        console.log('✅ Concatenation finished')
-        
-        // Nettoyer les fichiers temporaires
-        try {
-          for (const normalizedPath of normalizedPaths) {
-            await fs.unlink(normalizedPath)
-          }
-          await fs.unlink(listPath)
-          console.log('Temporary files cleaned up')
-        } catch (cleanupError) {
-          console.warn('Error cleaning up temp files:', cleanupError)
-        }
-        
+        console.log('✅ Concatenation with transitions finished')
+        await cleanupFiles(videoPaths, [])
         resolve(outputPath)
       })
-      .on('error', (err) => {
-        console.error('FFmpeg concatenation error:', err)
-        reject(err)
+      .on('error', async (err) => {
+        console.error('FFmpeg xfade error:', err)
+        // Fallback to simple concat without transitions
+        console.log('⚠️ Falling back to simple concatenation...')
+        try {
+          const result = await concatenateWithTransitions(videoPaths, durations, outputPath, tempDir, transitionDuration, false)
+          resolve(result)
+        } catch (fallbackErr) {
+          reject(fallbackErr)
+        }
       })
       .run()
   })
+}
+
+/**
+ * Clean up temporary files
+ */
+async function cleanupFiles(videoPaths: string[], otherFiles: string[]): Promise<void> {
+  try {
+    for (const filePath of [...videoPaths, ...otherFiles]) {
+      await fs.unlink(filePath).catch(() => {})
+    }
+    console.log('Temporary files cleaned up')
+  } catch (err) {
+    console.warn('Error cleaning up temp files:', err)
+  }
 }
 
 /**

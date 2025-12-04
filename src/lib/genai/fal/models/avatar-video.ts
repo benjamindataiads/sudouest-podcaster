@@ -1,8 +1,16 @@
 /**
- * Kling AI Avatar Video Model Configuration
+ * VEED Fabric 1.0 Fast - Lip-sync Video Model
  * 
- * Model: fal-ai/kling-video/v1/standard/ai-avatar
+ * Model: veed/fabric-1.0/fast
  * Use case: Generate lip-sync video from audio and avatar image
+ * 
+ * Input:
+ *   - image_url: Avatar image URL
+ *   - audio_url: Audio to lip-sync  
+ *   - resolution: "720p" or "480p"
+ * 
+ * Output:
+ *   - video: { url: string }
  */
 
 import { submitToFal } from '../client'
@@ -12,7 +20,7 @@ import type { VideoGenerationInput } from '../../types'
 // Model Configuration
 // ============================================
 
-export const AVATAR_VIDEO_MODEL = 'fal-ai/kling-video/v1/standard/ai-avatar'
+export const AVATAR_VIDEO_MODEL = 'veed/fabric-1.0/fast'
 
 // Default avatar image URL (Sud-Ouest presenter)
 export const DEFAULT_AVATAR_IMAGE_URL = 'https://dataiads-test1.fr/sudouest/avatarsudsouest.png'
@@ -21,17 +29,19 @@ export const DEFAULT_AVATAR_IMAGE_URL = 'https://dataiads-test1.fr/sudouest/avat
 // Input/Output Types (fal.ai specific)
 // ============================================
 
-interface AvatarVideoInput {
+interface FabricVideoInput {
   image_url: string      // Avatar image URL
   audio_url: string      // Audio to lip-sync
-  prompt?: string        // Additional prompt (optional)
+  resolution: '720p' | '480p'  // Video resolution
 }
 
-interface AvatarVideoOutput {
+interface FabricVideoOutput {
   video: {
     url: string
+    content_type?: string
+    file_name?: string
+    file_size?: number
   }
-  duration?: number
 }
 
 // ============================================
@@ -39,7 +49,7 @@ interface AvatarVideoOutput {
 // ============================================
 
 /**
- * Submit an avatar video generation job to fal.ai
+ * Submit a lip-sync video generation job to fal.ai (VEED Fabric)
  * Returns immediately with request_id - result will come via webhook
  */
 export async function submitAvatarVideo(input: VideoGenerationInput): Promise<{ requestId: string }> {
@@ -53,15 +63,16 @@ export async function submitAvatarVideo(input: VideoGenerationInput): Promise<{ 
     throw new Error(`Invalid image URL: ${imageUrl}`)
   }
   
-  const falInput: AvatarVideoInput = {
+  const falInput: FabricVideoInput = {
     audio_url: input.audioUrl,
     image_url: imageUrl,
-    prompt: 'Animate only the person for lip sync. Keep all logos, text, and background elements completely static and unchanged. Natural subtle hand movements while speaking. Do not add, remove, or animate any logos or graphics. Preserve the original image composition.',
+    resolution: '720p',
   }
   
-  console.log(`🎬 Submitting avatar video:`)
+  console.log(`🎬 Submitting lip-sync video (VEED Fabric):`)
   console.log(`   Audio: ${input.audioUrl}`)
   console.log(`   Image: ${imageUrl}`)
+  console.log(`   Resolution: 720p`)
   
   const response = await submitToFal({
     model: AVATAR_VIDEO_MODEL,
@@ -73,36 +84,33 @@ export async function submitAvatarVideo(input: VideoGenerationInput): Promise<{ 
 }
 
 /**
- * Submit multiple avatar video jobs in parallel
+ * Submit multiple video jobs in parallel
  * Returns array of request IDs
  */
 export async function submitAvatarVideoBatch(
   inputs: VideoGenerationInput[]
 ): Promise<{ requestIds: string[] }> {
-  console.log(`🎬 Submitting ${inputs.length} avatar video jobs in parallel...`)
+  console.log(`🎬 Submitting ${inputs.length} lip-sync video jobs in parallel...`)
   
   const promises = inputs.map(input => submitAvatarVideo(input))
   const results = await Promise.all(promises)
   
   const requestIds = results.map(r => r.requestId)
-  console.log(`✅ Submitted ${requestIds.length} avatar video jobs`)
+  console.log(`✅ Submitted ${requestIds.length} video jobs`)
   
   return { requestIds }
 }
 
 /**
- * Parse webhook result for avatar video
+ * Parse webhook result for VEED Fabric video
  */
-export function parseAvatarVideoResult(payload: AvatarVideoOutput): { 
+export function parseAvatarVideoResult(payload: FabricVideoOutput): { 
   videoUrl: string
-  duration?: number 
 } {
   if (!payload?.video?.url) {
-    throw new Error('Invalid avatar video result: missing video URL')
+    throw new Error('Invalid video result: missing video URL')
   }
   return { 
     videoUrl: payload.video.url,
-    duration: payload.duration,
   }
 }
-

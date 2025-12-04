@@ -426,6 +426,7 @@ interface GenerateVideoResult {
 
 /**
  * Submit a video generation job to fal.ai with webhook callback (no polling)
+ * Uses VEED Fabric 1.0 Fast model for lip-sync video generation
  * Returns the request_id - result will come via webhook
  */
 export async function submitVideoWithWebhook(
@@ -437,9 +438,9 @@ export async function submitVideoWithWebhook(
   const webhookUrl = getWebhookUrl()
   const imageUrl = avatarImageUrl || DEFAULT_IMAGE_URL
   
-  console.log(`🎬 Submitting video generation with webhook: ${webhookUrl}`)
-  console.log(`  Audio URL: ${audioUrl}`)
-  console.log(`  Avatar image URL: ${imageUrl}`)
+  console.log(`🎬 Submitting video generation (VEED Fabric) with webhook: ${webhookUrl}`)
+  console.log(`   Audio URL: ${audioUrl}`)
+  console.log(`   Image URL: ${imageUrl}`)
   
   // Validate URLs
   if (!audioUrl || !audioUrl.startsWith('http')) {
@@ -450,8 +451,9 @@ export async function submitVideoWithWebhook(
     throw new Error(`Invalid image URL: ${imageUrl}`)
   }
   
-  // Submit with webhook
-  const response = await fetch(`https://queue.fal.run/fal-ai/kling-video/v1/standard/ai-avatar?fal_webhook=${encodeURIComponent(webhookUrl)}`, {
+  // Submit with webhook - VEED Fabric 1.0 Fast model
+  // Note: No 'prompt' parameter, only image_url, audio_url, resolution
+  const response = await fetch(`https://queue.fal.run/veed/fabric-1.0/fast?fal_webhook=${encodeURIComponent(webhookUrl)}`, {
     method: 'POST',
     headers: {
       'Authorization': `Key ${process.env.FAL_KEY}`,
@@ -460,17 +462,17 @@ export async function submitVideoWithWebhook(
     body: JSON.stringify({
       image_url: imageUrl,
       audio_url: audioUrl,
-      prompt: '.',
+      resolution: '720p',
     }),
   })
   
   if (!response.ok) {
     const errorText = await response.text()
-    throw new Error(`Failed to submit video: ${response.status} - ${errorText}`)
+    throw new Error(`Failed to submit video (VEED Fabric): ${response.status} - ${errorText}`)
   }
   
   const { request_id } = await response.json()
-  console.log(`✅ Video submitted with webhook: ${request_id}`)
+  console.log(`✅ Video submitted (VEED Fabric): ${request_id}`)
   
   return { requestId: request_id, webhookUrl }
 }

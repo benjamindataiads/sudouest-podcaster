@@ -1,7 +1,46 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { uploadBuffer, isBucketConfigured } from '@/lib/services/storage'
+import { exec } from 'child_process'
+import { promisify } from 'util'
+import fs from 'fs/promises'
+import path from 'path'
+import os from 'os'
+
+const execAsync = promisify(exec)
 
 export const dynamic = 'force-dynamic'
+
+/**
+ * Convert audio file to MP3 using ffmpeg
+ */
+async function convertToMp3(inputBuffer: Buffer, inputFormat: string): Promise<Buffer> {
+  const tempDir = os.tmpdir()
+  const inputPath = path.join(tempDir, `input-${Date.now()}.${inputFormat}`)
+  const outputPath = path.join(tempDir, `output-${Date.now()}.mp3`)
+  
+  try {
+    // Write input file
+    await fs.writeFile(inputPath, inputBuffer)
+    
+    // Convert to MP3 with ffmpeg
+    console.log(`🔄 Converting ${inputFormat} to MP3...`)
+    await execAsync(`ffmpeg -i "${inputPath}" -vn -ar 44100 -ac 2 -b:a 192k "${outputPath}" -y`)
+    
+    // Read output file
+    const mp3Buffer = await fs.readFile(outputPath)
+    console.log(`✅ Conversion complete: ${mp3Buffer.length} bytes`)
+    
+    return mp3Buffer
+  } finally {
+    // Cleanup temp files
+    try {
+      await fs.unlink(inputPath).catch(() => {})
+      await fs.unlink(outputPath).catch(() => {})
+    } catch {
+      // Ignore cleanup errors
+    }
+  }
+}
 
 /**
  * GET /api/avatars/upload
@@ -64,14 +103,37 @@ export async function POST(request: NextRequest) {
     
     // Generate unique filename
     const timestamp = Date.now()
-    const extension = file.name.split('.').pop() || (type === 'voice' ? 'mp3' : 'png')
-    const key = `avatars/${type}s/${timestamp}-${Math.random().toString(36).substring(7)}.${extension}`
+    const randomId = Math.random().toString(36).substring(7)
+    
+    let buffer: Buffer = Buffer.from(await file.arrayBuffer())
+    let contentType = file.type
+    let finalExtension: string
+    
+    // For voice files, convert to MP3 if not already MP3
+    if (type === 'voice') {
+      const isWebm = file.type.includes('webm') || file.name.endsWith('.webm')
+      const isWav = file.type.includes('wav') || file.name.endsWith('.wav')
+      const isOgg = file.type.includes('ogg') || file.name.endsWith('.ogg')
+      const isMp3 = file.type.includes('mpeg') || file.type.includes('mp3') || file.name.endsWith('.mp3')
+      
+      if (!isMp3 && (isWebm || isWav || isOgg)) {
+        console.log(`🎵 Audio format detected: ${file.type}, converting to MP3...`)
+        const inputFormat = isWebm ? 'webm' : isWav ? 'wav' : 'ogg'
+        const convertedBuffer = await convertToMp3(buffer, inputFormat)
+        buffer = Buffer.from(convertedBuffer)
+        contentType = 'audio/mpeg'
+      }
+      finalExtension = 'mp3'
+    } else {
+      finalExtension = file.name.split('.').pop() || 'png'
+    }
+    
+    const key = `avatars/${type}s/${timestamp}-${randomId}.${finalExtension}`
     
     console.log(`📤 Uploading ${type} to R2: ${key}`)
     
     // Upload to R2
-    const buffer = Buffer.from(await file.arrayBuffer())
-    const publicUrl = await uploadBuffer(buffer, key, file.type)
+    const publicUrl = await uploadBuffer(buffer, key, contentType)
     
     console.log(`✅ Uploaded avatar ${type}: ${publicUrl}`)
     

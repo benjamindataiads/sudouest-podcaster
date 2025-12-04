@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
         console.log(`📥 Fetching result for job ${job.id} (${job.falRequestId})`)
 
         // Try to get the result from fal.ai
-        const result = await fal.queue.result('fal-ai/kling-video/v1/standard/ai-avatar', {
+    const result = await fal.queue.result('fal-ai/kling-video/v1/standard/ai-avatar', {
           requestId: job.falRequestId!,
         }) as { video?: { url?: string } }
 
@@ -61,14 +61,14 @@ export async function POST(request: NextRequest) {
 
           // Update job as completed
           await db
-            .update(videoJobs)
-            .set({
-              status: 'completed',
+      .update(videoJobs)
+      .set({
+        status: 'completed',
               videoUrl: finalVideoUrl,
               error: null,
-              completedAt: new Date(),
-              updatedAt: new Date(),
-            })
+        completedAt: new Date(),
+        updatedAt: new Date(),
+      })
             .where(eq(videoJobs.id, job.id))
 
           results.push({

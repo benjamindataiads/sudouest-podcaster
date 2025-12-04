@@ -254,9 +254,9 @@ export default function HomePage() {
                                 />
                               ))}
                             </div>
-                            <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(podcast.status)}`}>
-                              {getStatusLabel(podcast.status)}
-                            </span>
+                          <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(podcast.status)}`}>
+                            {getStatusLabel(podcast.status)}
+                          </span>
                           </div>
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-600 hidden md:table-cell">

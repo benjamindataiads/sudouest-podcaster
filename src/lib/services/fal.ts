@@ -5,9 +5,9 @@ let falConfigured = false
 
 function ensureFalConfigured() {
   if (!falConfigured) {
-    fal.config({
-      credentials: process.env.FAL_KEY,
-    })
+fal.config({
+  credentials: process.env.FAL_KEY,
+})
     falConfigured = true
   }
 }
@@ -261,7 +261,7 @@ export async function generateAudio({
     if (scriptChunks && scriptChunks.length > 0) {
       console.log(`🚀 Generating ${scriptChunks.length} audio chunks IN PARALLEL using Minimax Voice Clone (polling mode)`)
       
-      if (onProgress) {
+        if (onProgress) {
         onProgress(10, `Soumission de ${scriptChunks.length} chunks audio en parallèle...`)
       }
       

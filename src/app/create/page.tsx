@@ -193,7 +193,7 @@ function CreatePodcastPageContent() {
         let hasAudio = false
         if (podcast.audioChunks && podcast.audioChunks.length > 0 && podcast.audioChunks[0].url) {
           setAudioChunks(podcast.audioChunks)
-          setAudioUrl(podcast.audioChunks[0].url)
+            setAudioUrl(podcast.audioChunks[0].url)
           setAudioProgress({ completed: podcast.audioChunks.length, total: podcast.audioChunks.length })
           hasAudio = true
           console.log('✅ Audio loaded from podcast:', podcast.audioChunks.length, 'chunks')
@@ -348,7 +348,7 @@ function CreatePodcastPageContent() {
       script: generatedScript,
       estimatedDuration: generatedScript.estimatedDuration,
     })
-
+    
     // Créer des placeholders pour l'audio
     const placeholders = (generatedScript.chunks || []).map((chunk, idx) => ({
       url: '',
@@ -450,7 +450,7 @@ function CreatePodcastPageContent() {
             </Link>
             {podcastId && (
               <div className="flex items-center gap-2">
-                <span className="text-xs bg-white/20 px-3 py-1 rounded-full">
+              <span className="text-xs bg-white/20 px-3 py-1 rounded-full">
                   Podcast #{podcastId}
                 </span>
                 {audioJobId && audioProgress.total > 0 && audioProgress.completed < audioProgress.total && (
@@ -462,7 +462,7 @@ function CreatePodcastPageContent() {
                 {audioProgress.total > 0 && audioProgress.completed === audioProgress.total && (
                   <span className="flex items-center gap-1 text-xs px-3 py-1 rounded-full bg-green-500 text-white">
                     ✓ Audio complet ({audioProgress.total})
-                  </span>
+              </span>
                 )}
               </div>
             )}

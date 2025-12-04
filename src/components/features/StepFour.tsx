@@ -474,10 +474,10 @@ export default function StepFour({
                   {chunk.url ? (
                     <audio controls src={chunk.url} className="flex-1 h-8" />
                   ) : (
-                    <div className="flex-1 flex items-center gap-2">
-                      <Loader2 className="h-4 w-4 animate-spin text-orange-500" />
+                  <div className="flex-1 flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin text-orange-500" />
                       <span className="text-sm text-gray-600 line-clamp-1">{chunk.text?.substring(0, 60)}...</span>
-                    </div>
+                  </div>
                   )}
                 </div>
               ))}

@@ -168,36 +168,36 @@ export default function CreatePodcastDialog({ children }: CreatePodcastDialogPro
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Nom du podcast */}
-            <div className="space-y-2">
-              <Label htmlFor="podcast-name" className="text-sm font-medium">
-                Nom du podcast *
-              </Label>
+          {/* Nom du podcast */}
+          <div className="space-y-2">
+            <Label htmlFor="podcast-name" className="text-sm font-medium">
+              Nom du podcast *
+            </Label>
+            <Input
+              id="podcast-name"
+              placeholder="Ex: Actualités du jour"
+              value={podcastName}
+              onChange={(e) => setPodcastName(e.target.value)}
+              className="w-full"
+              disabled={loading}
+            />
+          </div>
+
+          {/* Date */}
+          <div className="space-y-2">
+            <Label htmlFor="podcast-date" className="text-sm font-medium">
+              Date
+            </Label>
+            <div className="relative">
               <Input
-                id="podcast-name"
-                placeholder="Ex: Actualités du jour"
-                value={podcastName}
-                onChange={(e) => setPodcastName(e.target.value)}
+                id="podcast-date"
+                type="date"
+                value={podcastDate}
+                onChange={(e) => setPodcastDate(e.target.value)}
                 className="w-full"
                 disabled={loading}
               />
-            </div>
-
-            {/* Date */}
-            <div className="space-y-2">
-              <Label htmlFor="podcast-date" className="text-sm font-medium">
-                Date
-              </Label>
-              <div className="relative">
-                <Input
-                  id="podcast-date"
-                  type="date"
-                  value={podcastDate}
-                  onChange={(e) => setPodcastDate(e.target.value)}
-                  className="w-full"
-                  disabled={loading}
-                />
-                <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+              <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
               </div>
             </div>
           </div>
@@ -217,19 +217,19 @@ export default function CreatePodcastDialog({ children }: CreatePodcastDialogPro
               )}
               <div>
                 <p className="text-base font-semibold text-gray-900">
-                  {podcastName || 'Nom du podcast'}
-                </p>
+              {podcastName || 'Nom du podcast'}
+            </p>
                 <p className="text-sm text-gray-600">
                   {selectedAvatar ? `Présenté par ${selectedAvatar.name}` : 'Sélectionnez un avatar'}
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
-                  {new Date(podcastDate).toLocaleDateString('fr-FR', {
-                    weekday: 'long',
-                    day: 'numeric',
-                    month: 'long',
-                    year: 'numeric'
-                  })}
-                </p>
+              {new Date(podcastDate).toLocaleDateString('fr-FR', {
+                weekday: 'long',
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric'
+              })}
+            </p>
               </div>
             </div>
           </div>

@@ -74,7 +74,7 @@ export async function POST() {
         jobToProcess.audioUrl,
         avatarImageUrl
       )
-
+        
       console.log(`✅ Video submitted to fal.ai`)
       console.log(`  Request ID: ${requestId}`)
       console.log(`  Webhook URL: ${webhookUrl}`)

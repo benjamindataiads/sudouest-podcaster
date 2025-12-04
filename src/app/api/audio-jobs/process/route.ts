@@ -31,15 +31,15 @@ export async function POST() {
     const scriptChunks = (queuedJob.scriptChunks || []) as ScriptChunk[]
     
     if (scriptChunks.length === 0) {
-      await db
-        .update(audioJobs)
-        .set({
+    await db
+      .update(audioJobs)
+      .set({ 
           status: 'failed',
           error: 'No script chunks provided',
           updatedAt: new Date(),
-        })
-        .where(eq(audioJobs.id, queuedJob.id))
-      
+      })
+      .where(eq(audioJobs.id, queuedJob.id))
+
       return NextResponse.json({
         success: false,
         jobId: queuedJob.id,

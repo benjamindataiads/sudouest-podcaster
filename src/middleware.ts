@@ -5,11 +5,14 @@ const isProtectedRoute = createRouteMatcher([
   '/create(.*)',
   '/gallery(.*)',
   '/avatars(.*)',
-  '/api/podcasts(.*)',
-  '/api/audio-jobs(.*)',
-  '/api/video-jobs(.*)',
+  // Protected API routes (write operations)
+  '/api/podcasts/save(.*)',
+  '/api/podcasts/delete(.*)',
+  '/api/audio-jobs/process(.*)',
+  '/api/video-jobs/process(.*)',
   '/api/avatars(.*)',
   '/api/articles/analyze(.*)',
+  '/api/video/assemble(.*)',
 ])
 
 // Define public routes (always accessible)
@@ -17,10 +20,14 @@ const isPublicRoute = createRouteMatcher([
   '/',
   '/sign-in(.*)',
   '/sign-up(.*)',
+  // Public API routes (read operations)
   '/api/webhooks(.*)',
   '/api/files(.*)',
   '/api/db/migrate(.*)',
   '/api/debug(.*)',
+  '/api/podcasts/latest(.*)',
+  '/api/video-jobs/check-stale(.*)',
+  '/api/articles(.*)',
 ])
 
 export default clerkMiddleware(async (auth, req) => {

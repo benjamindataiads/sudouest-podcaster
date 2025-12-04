@@ -1,22 +1,16 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import { SignInButton, SignUpButton, SignedIn, SignedOut, UserButton } from '@clerk/nextjs'
 import { Button } from '@/components/ui/button'
 import { User, Film } from 'lucide-react'
 import Link from 'next/link'
 
+// Check at build time if Clerk is configured
+const isClerkConfigured = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+
 export default function AuthButtons() {
-  const [clerkLoaded, setClerkLoaded] = useState(false)
-
-  useEffect(() => {
-    // Check if Clerk is available (publishable key is set)
-    const hasClerk = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
-    setClerkLoaded(hasClerk)
-  }, [])
-
-  // If Clerk is not configured, show the navigation buttons without auth
-  if (!clerkLoaded) {
+  // If Clerk is not configured, show navigation buttons without auth
+  if (!isClerkConfigured) {
     return (
       <>
         <Link href="/avatars">

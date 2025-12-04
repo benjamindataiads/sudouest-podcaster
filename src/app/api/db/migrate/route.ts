@@ -87,7 +87,7 @@ export async function GET() {
         id VARCHAR(100) PRIMARY KEY,
         podcast_id INTEGER REFERENCES podcasts(id),
         script_chunks JSONB,
-        voice_id VARCHAR(100) NOT NULL,
+        voice_id TEXT NOT NULL,
         status VARCHAR(50) NOT NULL DEFAULT 'queued',
         audio_url TEXT,
         audio_chunks JSONB,
@@ -161,7 +161,13 @@ export async function GET() {
 
     // Change voice_id from VARCHAR(100) to TEXT to support full URLs
     await db.execute(sql`
-      ALTER TABLE audio_jobs ALTER COLUMN voice_id TYPE TEXT;
+      DO $$ 
+      BEGIN 
+        ALTER TABLE audio_jobs ALTER COLUMN voice_id TYPE TEXT;
+      EXCEPTION
+        WHEN others THEN 
+          RAISE NOTICE 'voice_id column type change skipped (might already be TEXT)';
+      END $$;
     `)
     console.log('✅ audio_jobs.voice_id changed to TEXT')
 

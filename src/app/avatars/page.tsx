@@ -308,6 +308,7 @@ function AvatarModal({
   const [aiPrompt, setAiPrompt] = useState('')
   const [aiSourceImages, setAiSourceImages] = useState<string[]>([])
   const [aiResolution, setAiResolution] = useState<'1K' | '2K' | '4K'>('1K')
+  const [aiAspectRatio, setAiAspectRatio] = useState<string>('1:1')
   const [aiGenerating, setAiGenerating] = useState(false)
   const [aiGeneratedImages, setAiGeneratedImages] = useState<Array<{ url: string; width?: number; height?: number }>>([])
   
@@ -638,6 +639,7 @@ De Bordeaux à Biarritz, en passant par Pau et Arcachon, nous allons explorer en
           prompt: aiPrompt,
           imageUrls: aiSourceImages,
           numImages: 4,
+          aspectRatio: aiAspectRatio,
           resolution: aiResolution,
           outputFormat: 'png',
         }),
@@ -1071,19 +1073,37 @@ De Bordeaux à Biarritz, en passant par Pau et Arcachon, nous allons explorer en
                     />
                   </div>
 
-                  {/* Resolution */}
-                  <div className="space-y-2 mb-4">
-                    <Label className="text-purple-900">Résolution</Label>
-                    <Select value={aiResolution} onValueChange={(v) => setAiResolution(v as '1K' | '2K' | '4K')}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1K">1K (rapide)</SelectItem>
-                        <SelectItem value="2K">2K (standard)</SelectItem>
-                        <SelectItem value="4K">4K (haute qualité)</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  {/* Aspect Ratio & Resolution */}
+                  <div className="grid grid-cols-2 gap-3 mb-4">
+                    <div className="space-y-2">
+                      <Label className="text-purple-900">Format</Label>
+                      <Select value={aiAspectRatio} onValueChange={setAiAspectRatio}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1:1">1:1 (Carré)</SelectItem>
+                          <SelectItem value="4:3">4:3 (Standard)</SelectItem>
+                          <SelectItem value="3:4">3:4 (Portrait)</SelectItem>
+                          <SelectItem value="16:9">16:9 (Paysage)</SelectItem>
+                          <SelectItem value="9:16">9:16 (Vertical)</SelectItem>
+                          <SelectItem value="auto">Auto</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-purple-900">Résolution</Label>
+                      <Select value={aiResolution} onValueChange={(v) => setAiResolution(v as '1K' | '2K' | '4K')}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1K">1K (rapide)</SelectItem>
+                          <SelectItem value="2K">2K (standard)</SelectItem>
+                          <SelectItem value="4K">4K (haute qualité)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
 
                   {/* Generate Button */}

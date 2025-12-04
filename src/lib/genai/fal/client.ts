@@ -41,7 +41,7 @@ const FAL_QUEUE_BASE = 'https://queue.fal.run'
 
 interface FalSubmitOptions {
   model: string
-  input: Record<string, unknown>
+  input: object
   useWebhook?: boolean
 }
 

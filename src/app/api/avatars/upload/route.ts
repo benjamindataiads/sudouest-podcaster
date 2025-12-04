@@ -1,30 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
+import { uploadBuffer, isBucketConfigured } from '@/lib/services/storage'
 
 export const dynamic = 'force-dynamic'
 
 /**
  * GET /api/avatars/upload
- * Check if bucket is configured
+ * Check if R2 is configured
  */
 export async function GET() {
-  const bucketEndpoint = process.env.ENDPOINT || process.env.BUCKET_ENDPOINT
-  const bucketName = process.env.BUCKET || process.env.BUCKET_NAME
-  const accessKeyId = process.env.ACCESS_KEY_ID || process.env.BUCKET_ACCESS_KEY_ID
-  const secretAccessKey = process.env.SECRET_ACCESS_KEY || process.env.BUCKET_SECRET_ACCESS_KEY
-  
   return NextResponse.json({
-    configured: !!(bucketEndpoint && bucketName && accessKeyId && secretAccessKey),
-    endpoint: bucketEndpoint ? 'set' : 'missing',
-    bucketName: bucketName ? 'set' : 'missing',
-    accessKeyId: accessKeyId ? 'set' : 'missing',
-    secretAccessKey: secretAccessKey ? 'set' : 'missing',
+    configured: isBucketConfigured(),
+    r2Endpoint: process.env.R2_ENDPOINT ? 'set' : 'missing',
+    r2Bucket: process.env.R2_BUCKET ? 'set' : 'missing',
+    r2AccessKeyId: process.env.R2_ACCESS_KEY_ID ? 'set' : 'missing',
+    r2SecretAccessKey: process.env.R2_SECRET_ACCESS_KEY ? 'set' : 'missing',
+    r2PublicUrl: process.env.R2_PUBLIC_URL ? 'set' : 'missing',
   })
 }
 
 /**
  * POST /api/avatars/upload
- * Upload avatar files (voice MP3 or image) to bucket
+ * Upload avatar files (voice MP3 or image) to Cloudflare R2
  */
 export async function POST(request: NextRequest) {
   try {
@@ -49,93 +45,39 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Image file must be an image (PNG, JPG)' }, { status: 400 })
     }
     
-    // Check if bucket is configured (Railway uses ENDPOINT, BUCKET, ACCESS_KEY_ID, SECRET_ACCESS_KEY)
-    const bucketEndpoint = process.env.ENDPOINT || process.env.BUCKET_ENDPOINT
-    const bucketName = process.env.BUCKET || process.env.BUCKET_NAME
-    const accessKeyId = process.env.ACCESS_KEY_ID || process.env.BUCKET_ACCESS_KEY_ID
-    const secretAccessKey = process.env.SECRET_ACCESS_KEY || process.env.BUCKET_SECRET_ACCESS_KEY
-    
-    console.log('Bucket config:', {
-      endpoint: bucketEndpoint ? 'set' : 'missing',
-      bucketName: bucketName ? 'set' : 'missing',
-      accessKeyId: accessKeyId ? 'set' : 'missing',
-      secretAccessKey: secretAccessKey ? 'set' : 'missing',
-    })
-    
-    if (!bucketEndpoint || !bucketName || !accessKeyId || !secretAccessKey) {
+    // Check if R2 is configured
+    if (!isBucketConfigured()) {
       return NextResponse.json(
         { 
-          error: 'Bucket storage not configured',
+          error: 'R2 storage not configured',
           missing: {
-            ENDPOINT: !bucketEndpoint,
-            BUCKET: !bucketName,
-            ACCESS_KEY_ID: !accessKeyId,
-            SECRET_ACCESS_KEY: !secretAccessKey,
+            R2_ENDPOINT: !process.env.R2_ENDPOINT,
+            R2_BUCKET: !process.env.R2_BUCKET,
+            R2_ACCESS_KEY_ID: !process.env.R2_ACCESS_KEY_ID,
+            R2_SECRET_ACCESS_KEY: !process.env.R2_SECRET_ACCESS_KEY,
+            R2_PUBLIC_URL: !process.env.R2_PUBLIC_URL,
           }
         },
         { status: 500 }
       )
     }
     
-    // Create S3 client for Railway storage
-    console.log(`🔧 Creating S3 client with endpoint: ${bucketEndpoint}`)
-    const s3Client = new S3Client({
-      endpoint: bucketEndpoint,
-      region: 'us-east-1', // Railway uses us-east-1
-      credentials: { accessKeyId, secretAccessKey },
-      forcePathStyle: true, // Try path-style first
-    })
-    
     // Generate unique filename
     const timestamp = Date.now()
     const extension = file.name.split('.').pop() || (type === 'voice' ? 'mp3' : 'png')
     const key = `avatars/${type}s/${timestamp}-${Math.random().toString(36).substring(7)}.${extension}`
     
-    console.log(`📤 Uploading ${type} to bucket: ${bucketName}/${key}`)
+    console.log(`📤 Uploading ${type} to R2: ${key}`)
     
-    // Upload to bucket
+    // Upload to R2
     const buffer = Buffer.from(await file.arrayBuffer())
+    const publicUrl = await uploadBuffer(buffer, key, file.type)
     
-    try {
-      await s3Client.send(new PutObjectCommand({
-        Bucket: bucketName,
-        Key: key,
-        Body: buffer,
-        ContentType: file.type,
-        ACL: 'public-read', // Make file publicly accessible
-      }))
-    } catch (s3Error) {
-      console.error('S3 upload error:', s3Error)
-      // If ACL fails, try without it
-      if (String(s3Error).includes('ACL')) {
-        console.log('Retrying without ACL...')
-        await s3Client.send(new PutObjectCommand({
-          Bucket: bucketName,
-          Key: key,
-          Body: buffer,
-          ContentType: file.type,
-        }))
-      } else {
-        throw s3Error
-      }
-    }
-    
-    // Use direct bucket URL for fal.ai to access
-    // Format: https://{bucket}.{endpoint-host}/{key}
-    const endpointUrl = new URL(bucketEndpoint)
-    const directUrl = `https://${bucketName}.${endpointUrl.host}/${key}`
-    
-    // Also provide proxy URL for frontend display with CORS
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || ''
-    const proxyUrl = `${baseUrl}/api/files/${key}`
-    
-    console.log(`✅ Uploaded avatar ${type}: ${directUrl}`)
-    console.log(`   Proxy URL: ${proxyUrl}`)
+    console.log(`✅ Uploaded avatar ${type}: ${publicUrl}`)
     
     return NextResponse.json({
       success: true,
-      url: directUrl, // Direct URL for fal.ai to access
-      proxyUrl,       // Proxy URL for frontend display
+      url: publicUrl, // Public R2 URL (works for frontend AND fal.ai)
       type,
       filename: file.name,
     })
@@ -147,4 +89,3 @@ export async function POST(request: NextRequest) {
     )
   }
 }
-

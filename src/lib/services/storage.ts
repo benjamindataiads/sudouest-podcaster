@@ -3,29 +3,32 @@ import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3
 let s3Client: S3Client | null = null
 
 /**
- * Get or create S3 client for bucket operations
- * Supports both Railway reference names and manual names
+ * Get or create S3 client for Cloudflare R2
+ * 
+ * Required environment variables:
+ * - R2_ENDPOINT: https://<account_id>.r2.cloudflarestorage.com
+ * - R2_ACCESS_KEY_ID: Access key from R2 API token
+ * - R2_SECRET_ACCESS_KEY: Secret key from R2 API token
+ * - R2_BUCKET: Bucket name (e.g., sudouest-podcaster)
+ * - R2_PUBLIC_URL: Public URL (e.g., https://pub-xxx.r2.dev)
  */
 function getS3Client(): S3Client {
   if (!s3Client) {
-    // Railway uses ENDPOINT, ACCESS_KEY_ID, SECRET_ACCESS_KEY when using references
-    // Also support manual BUCKET_* names for flexibility
-    const endpoint = process.env.ENDPOINT || process.env.BUCKET_ENDPOINT
-    const accessKeyId = process.env.ACCESS_KEY_ID || process.env.BUCKET_ACCESS_KEY_ID
-    const secretAccessKey = process.env.SECRET_ACCESS_KEY || process.env.BUCKET_SECRET_ACCESS_KEY
+    const endpoint = process.env.R2_ENDPOINT
+    const accessKeyId = process.env.R2_ACCESS_KEY_ID
+    const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY
     
     if (!endpoint || !accessKeyId || !secretAccessKey) {
-      throw new Error('Bucket configuration missing. Set ENDPOINT, ACCESS_KEY_ID, and SECRET_ACCESS_KEY (or BUCKET_* variants)')
+      throw new Error('R2 configuration missing. Set R2_ENDPOINT, R2_ACCESS_KEY_ID, and R2_SECRET_ACCESS_KEY')
     }
     
     s3Client = new S3Client({
       endpoint,
-      region: 'auto', // Tigris/R2 use 'auto'
+      region: 'auto', // R2 uses 'auto'
       credentials: {
         accessKeyId,
         secretAccessKey,
       },
-      forcePathStyle: true, // Required for some S3-compatible services
     })
   }
   
@@ -34,44 +37,36 @@ function getS3Client(): S3Client {
 
 /**
  * Get the bucket name from environment
- * Railway uses BUCKET when using references
  */
 function getBucketName(): string {
-  const bucketName = process.env.BUCKET || process.env.BUCKET_NAME
+  const bucketName = process.env.R2_BUCKET
   if (!bucketName) {
-    throw new Error('BUCKET environment variable not set')
+    throw new Error('R2_BUCKET environment variable not set')
   }
   return bucketName
 }
 
 /**
- * Get the direct public URL for the bucket (for external services like fal.ai)
- * Railway storage format: https://{bucket}.{endpoint-host}/{key}
+ * Get the public URL for a file in R2
+ * Files uploaded to R2 are publicly accessible via the public URL
  */
-export function getDirectBucketUrl(key: string): string {
-  const endpoint = process.env.ENDPOINT || process.env.BUCKET_ENDPOINT || ''
-  const bucketName = getBucketName()
-  
-  // Parse the endpoint to get the host
-  // e.g., https://storage.railway.app -> storage.railway.app
-  const endpointUrl = new URL(endpoint)
-  const directUrl = `https://${bucketName}.${endpointUrl.host}/${key}`
-  
-  return directUrl
+export function getPublicUrl(key: string): string {
+  const publicUrl = process.env.R2_PUBLIC_URL
+  if (!publicUrl) {
+    throw new Error('R2_PUBLIC_URL environment variable not set')
+  }
+  return `${publicUrl}/${key}`
 }
 
 /**
- * Upload a file from a URL to the bucket
- * Downloads the file and uploads it to S3-compatible storage
- * 
- * @param useDirectUrl - If true, returns direct bucket URL (for external services like fal.ai)
- *                       If false, returns proxy URL (for frontend with CORS)
+ * Upload a file from a URL to R2 bucket
+ * Downloads the file and uploads it to Cloudflare R2
+ * Returns the public URL (accessible by anyone, including fal.ai)
  */
 export async function uploadFromUrl(
   sourceUrl: string,
   destinationKey: string,
-  contentType?: string,
-  useDirectUrl: boolean = false
+  contentType?: string
 ): Promise<string> {
   console.log(`📥 Downloading from: ${sourceUrl}`)
   
@@ -84,7 +79,7 @@ export async function uploadFromUrl(
   const buffer = Buffer.from(await response.arrayBuffer())
   console.log(`📦 Downloaded ${buffer.length} bytes`)
   
-  // Upload to bucket
+  // Upload to R2
   const client = getS3Client()
   const bucketName = getBucketName()
   
@@ -97,23 +92,17 @@ export async function uploadFromUrl(
   
   await client.send(command)
   
-  // Return direct bucket URL (for external services) or proxy URL (for frontend)
-  let publicUrl: string
-  if (useDirectUrl) {
-    publicUrl = getDirectBucketUrl(destinationKey)
-  } else {
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || ''
-    publicUrl = `${baseUrl}/api/files/${destinationKey}`
-  }
+  // Return public URL (R2 public URLs work everywhere!)
+  const publicUrl = getPublicUrl(destinationKey)
   
-  console.log(`✅ Uploaded to bucket: ${publicUrl}`)
+  console.log(`✅ Uploaded to R2: ${publicUrl}`)
   
   return publicUrl
 }
 
 /**
- * Upload audio file from fal.ai to bucket
- * Returns direct bucket URL (used by fal.ai for video generation)
+ * Upload audio file from fal.ai to R2
+ * Returns public URL (accessible by fal.ai for video generation)
  */
 export async function uploadAudioToBucket(
   falUrl: string,
@@ -121,12 +110,11 @@ export async function uploadAudioToBucket(
   chunkIndex: number
 ): Promise<string> {
   const key = `audio/${jobId}/chunk-${chunkIndex}.mp3`
-  // Use direct URL since this audio will be used by fal.ai for video generation
-  return uploadFromUrl(falUrl, key, 'audio/mpeg', true)
+  return uploadFromUrl(falUrl, key, 'audio/mpeg')
 }
 
 /**
- * Upload video file from fal.ai to bucket
+ * Upload video file from fal.ai to R2
  */
 export async function uploadVideoToBucket(
   falUrl: string,
@@ -137,7 +125,7 @@ export async function uploadVideoToBucket(
 }
 
 /**
- * Upload final podcast video to bucket
+ * Upload final podcast video to R2
  */
 export async function uploadFinalPodcastToBucket(
   localPath: string,
@@ -159,9 +147,8 @@ export async function uploadFinalPodcastToBucket(
   
   await client.send(command)
   
-  // Use proxy URL to serve files with proper CORS
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || ''
-  const publicUrl = `${baseUrl}/api/files/${key}`
+  // Return public URL
+  const publicUrl = getPublicUrl(key)
   
   console.log(`✅ Final podcast uploaded: ${publicUrl}`)
   
@@ -169,16 +156,42 @@ export async function uploadFinalPodcastToBucket(
 }
 
 /**
- * Check if bucket storage is configured
- * Supports both Railway reference names and manual names
+ * Upload a buffer directly to R2
+ */
+export async function uploadBuffer(
+  buffer: Buffer,
+  key: string,
+  contentType: string
+): Promise<string> {
+  const client = getS3Client()
+  const bucketName = getBucketName()
+  
+  const command = new PutObjectCommand({
+    Bucket: bucketName,
+    Key: key,
+    Body: buffer,
+    ContentType: contentType,
+  })
+  
+  await client.send(command)
+  
+  const publicUrl = getPublicUrl(key)
+  console.log(`✅ Uploaded to R2: ${publicUrl}`)
+  
+  return publicUrl
+}
+
+/**
+ * Check if R2 storage is configured
  */
 export function isBucketConfigured(): boolean {
-  const hasEndpoint = !!(process.env.ENDPOINT || process.env.BUCKET_ENDPOINT)
-  const hasAccessKey = !!(process.env.ACCESS_KEY_ID || process.env.BUCKET_ACCESS_KEY_ID)
-  const hasSecretKey = !!(process.env.SECRET_ACCESS_KEY || process.env.BUCKET_SECRET_ACCESS_KEY)
-  const hasBucket = !!(process.env.BUCKET || process.env.BUCKET_NAME)
-  
-  return hasEndpoint && hasAccessKey && hasSecretKey && hasBucket
+  return !!(
+    process.env.R2_ENDPOINT &&
+    process.env.R2_ACCESS_KEY_ID &&
+    process.env.R2_SECRET_ACCESS_KEY &&
+    process.env.R2_BUCKET &&
+    process.env.R2_PUBLIC_URL
+  )
 }
 
 /**

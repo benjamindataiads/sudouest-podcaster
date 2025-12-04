@@ -55,7 +55,7 @@ export async function PUT(
     }
     
     const body = await request.json()
-    const { name, voiceUrl, imageUrl } = body
+    const { name, voiceUrl, imageUrl, imageVariations } = body
     
     // Check if avatar exists
     const [existing] = await db
@@ -76,6 +76,7 @@ export async function PUT(
     if (name !== undefined) updateData.name = name
     if (voiceUrl !== undefined) updateData.voiceUrl = voiceUrl
     if (imageUrl !== undefined) updateData.imageUrl = imageUrl
+    if (imageVariations !== undefined) updateData.imageVariations = imageVariations
     
     const [updatedAvatar] = await db
       .update(avatars)

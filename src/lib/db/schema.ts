@@ -164,13 +164,23 @@ export const categories = pgTable('categories', {
 })
 
 /**
+ * Avatar image variant type
+ */
+export interface AvatarImageVariant {
+  url: string
+  label: string // 'original', 'variation-1', 'variation-2', 'variation-3'
+  description?: string // e.g. "Légère rotation tête gauche"
+}
+
+/**
  * Table pour stocker les avatars (personnages pour les podcasts)
  */
 export const avatars = pgTable('avatars', {
   id: serial('id').primaryKey(),
   name: varchar('name', { length: 100 }).notNull(),
   voiceUrl: text('voice_url').notNull(), // URL du fichier MP3 de référence pour le clonage vocal
-  imageUrl: text('image_url').notNull(), // URL de l'image de l'avatar
+  imageUrl: text('image_url').notNull(), // URL de l'image principale de l'avatar
+  imageVariations: jsonb('image_variations').$type<AvatarImageVariant[]>(), // 4 variations de pose
   isDefault: boolean('is_default').default(false), // Avatar par défaut (Benoit Lasserre)
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),

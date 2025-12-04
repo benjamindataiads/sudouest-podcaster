@@ -48,7 +48,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { name, voiceUrl, imageUrl } = body
+    const { name, voiceUrl, imageUrl, imageVariations } = body
     
     if (!name || !voiceUrl || !imageUrl) {
       return NextResponse.json(
@@ -63,11 +63,12 @@ export async function POST(request: NextRequest) {
         name,
         voiceUrl,
         imageUrl,
+        imageVariations: imageVariations || null,
         isDefault: false,
       })
       .returning()
     
-    console.log(`✅ Created avatar: ${name}`)
+    console.log(`✅ Created avatar: ${name} with ${imageVariations?.length || 0} variations`)
     
     return NextResponse.json({ avatar: newAvatar })
   } catch (error) {

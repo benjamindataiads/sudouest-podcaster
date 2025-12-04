@@ -171,6 +171,20 @@ export async function GET() {
     `)
     console.log('✅ audio_jobs.voice_id changed to TEXT')
 
+    // Add image_variations column to avatars if it doesn't exist
+    await db.execute(sql`
+      DO $$ 
+      BEGIN 
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'avatars' AND column_name = 'image_variations'
+        ) THEN 
+          ALTER TABLE avatars ADD COLUMN image_variations JSONB;
+        END IF;
+      END $$;
+    `)
+    console.log('✅ avatars.image_variations column added/verified')
+
     return NextResponse.json({
       success: true,
       message: 'All database tables created/verified successfully',

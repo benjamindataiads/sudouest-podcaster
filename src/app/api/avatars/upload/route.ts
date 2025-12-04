@@ -36,9 +36,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Type must be "voice" or "image"' }, { status: 400 })
     }
     
-    // Validate file type
-    if (type === 'voice' && !file.type.includes('audio')) {
-      return NextResponse.json({ error: 'Voice file must be an audio file (MP3)' }, { status: 400 })
+    // Validate file type (accept audio/mpeg, audio/webm, audio/wav, etc.)
+    if (type === 'voice' && !file.type.startsWith('audio/')) {
+      return NextResponse.json({ error: 'Voice file must be an audio file (MP3, WAV, WebM)' }, { status: 400 })
     }
     
     if (type === 'image' && !file.type.includes('image')) {

@@ -7,8 +7,11 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Textarea } from '@/components/ui/textarea'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import SudOuestLogo from '@/components/ui/SudOuestLogo'
-import { Plus, Film, Loader2, Play, Pause, Trash2, Edit2, User, Home } from 'lucide-react'
+import { Plus, Film, Loader2, Play, Pause, Trash2, Edit2, User, Home, Wand2, Upload, Sparkles, ImageIcon, Mic, Square, Volume2 } from 'lucide-react'
 
 interface Avatar {
   id: number
@@ -288,8 +291,32 @@ function AvatarModal({
   const [uploading, setUploading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<'upload' | 'ai'>('upload')
+  const [voiceTab, setVoiceTab] = useState<'upload' | 'record'>('upload')
+  
+  // Voice Recording state
+  const [isRecording, setIsRecording] = useState(false)
+  const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null)
+  const [recordedUrl, setRecordedUrl] = useState<string | null>(null)
+  const [recordingTime, setRecordingTime] = useState(0)
+  const [micPermission, setMicPermission] = useState<'granted' | 'denied' | 'prompt'>('prompt')
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const audioChunksRef = useRef<Blob[]>([])
+  const timerRef = useRef<NodeJS.Timeout | null>(null)
+  
+  // AI Maker state
+  const [aiPrompt, setAiPrompt] = useState('')
+  const [aiSourceImages, setAiSourceImages] = useState<string[]>([])
+  const [aiResolution, setAiResolution] = useState<'1K' | '2K' | '4K'>('1K')
+  const [aiGenerating, setAiGenerating] = useState(false)
+  const [aiGeneratedImages, setAiGeneratedImages] = useState<Array<{ url: string; width?: number; height?: number }>>([])
 
   const isEditing = !!avatar
+  
+  // Sample text for voice recording
+  const sampleText = `Bonjour et bienvenue dans ce podcast Sud Ouest. Je suis ravi de vous retrouver aujourd'hui pour vous présenter les actualités de notre belle région. 
+  
+De Bordeaux à Biarritz, en passant par Pau et Arcachon, nous allons explorer ensemble les événements qui font vibrer le Sud-Ouest de la France.`
 
   // Reset form when modal opens
   useEffect(() => {
@@ -298,8 +325,145 @@ function AvatarModal({
       setVoiceUrl(avatar?.voiceUrl || '')
       setImageUrl(avatar?.imageUrl || '')
       setError(null)
+      setAiPrompt('')
+      setAiSourceImages([])
+      setAiGeneratedImages([])
+      setRecordedBlob(null)
+      setRecordedUrl(null)
+      setRecordingTime(0)
+      setIsRecording(false)
+    }
+    
+    // Cleanup on unmount
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current)
+      }
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+        mediaRecorderRef.current.stop()
+      }
+      if (recordedUrl) {
+        URL.revokeObjectURL(recordedUrl)
+      }
     }
   }, [open, avatar])
+
+  // Check microphone permission
+  const checkMicPermission = async () => {
+    try {
+      const result = await navigator.permissions.query({ name: 'microphone' as PermissionName })
+      setMicPermission(result.state as 'granted' | 'denied' | 'prompt')
+      result.onchange = () => {
+        setMicPermission(result.state as 'granted' | 'denied' | 'prompt')
+      }
+    } catch {
+      // Fallback for browsers that don't support permissions API
+      setMicPermission('prompt')
+    }
+  }
+
+  useEffect(() => {
+    checkMicPermission()
+  }, [])
+
+  // Start recording
+  const startRecording = async () => {
+    try {
+      setError(null)
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      setMicPermission('granted')
+      
+      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' })
+      mediaRecorderRef.current = mediaRecorder
+      audioChunksRef.current = []
+      
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data)
+        }
+      }
+      
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
+        setRecordedBlob(audioBlob)
+        const url = URL.createObjectURL(audioBlob)
+        setRecordedUrl(url)
+        
+        // Stop all tracks
+        stream.getTracks().forEach(track => track.stop())
+      }
+      
+      mediaRecorder.start(100) // Collect data every 100ms
+      setIsRecording(true)
+      setRecordingTime(0)
+      
+      // Start timer
+      timerRef.current = setInterval(() => {
+        setRecordingTime(prev => prev + 1)
+      }, 1000)
+      
+    } catch (err) {
+      if (err instanceof Error && err.name === 'NotAllowedError') {
+        setMicPermission('denied')
+        setError('Accès au microphone refusé. Veuillez autoriser l\'accès dans les paramètres de votre navigateur.')
+      } else {
+        setError('Impossible d\'accéder au microphone: ' + (err instanceof Error ? err.message : String(err)))
+      }
+    }
+  }
+
+  // Stop recording
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      mediaRecorderRef.current.stop()
+      setIsRecording(false)
+      
+      if (timerRef.current) {
+        clearInterval(timerRef.current)
+        timerRef.current = null
+      }
+    }
+  }
+
+  // Upload recorded audio
+  const uploadRecording = async () => {
+    if (!recordedBlob) return
+    
+    setUploading(true)
+    setError(null)
+    
+    try {
+      // Convert webm to mp3-like format for upload
+      const formData = new FormData()
+      formData.append('file', recordedBlob, `voice-${Date.now()}.webm`)
+      formData.append('type', 'voice')
+      
+      const response = await fetch('/api/avatars/upload', {
+        method: 'POST',
+        body: formData,
+      })
+      
+      const data = await response.json()
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Échec de l\'upload')
+      }
+      
+      setVoiceUrl(data.url)
+      setVoiceTab('upload') // Switch back to show the result
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Échec de l\'upload de l\'enregistrement')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  // Format recording time
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins}:${secs.toString().padStart(2, '0')}`
+  }
 
   const handleFileUpload = async (file: File, type: 'voice' | 'image') => {
     setUploading(true)
@@ -331,6 +495,79 @@ function AvatarModal({
     } finally {
       setUploading(false)
     }
+  }
+
+  // Upload image for AI source
+  const handleAiSourceUpload = async (file: File) => {
+    setUploading(true)
+    setError(null)
+    
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('type', 'image')
+      
+      const response = await fetch('/api/avatars/upload', {
+        method: 'POST',
+        body: formData,
+      })
+      
+      const data = await response.json()
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Échec de l\'upload')
+      }
+      
+      setAiSourceImages(prev => [...prev, data.url])
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Échec de l\'upload')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  // Generate with AI
+  const handleAiGenerate = async () => {
+    if (!aiPrompt.trim() || aiSourceImages.length === 0) {
+      setError('Veuillez ajouter au moins une image source et un prompt')
+      return
+    }
+
+    setAiGenerating(true)
+    setError(null)
+    setAiGeneratedImages([])
+
+    try {
+      const response = await fetch('/api/genai/image-edit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: aiPrompt,
+          imageUrls: aiSourceImages,
+          numImages: 4,
+          resolution: aiResolution,
+          outputFormat: 'png',
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Échec de la génération')
+      }
+
+      setAiGeneratedImages(data.images || [])
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Échec de la génération')
+    } finally {
+      setAiGenerating(false)
+    }
+  }
+
+  // Select AI generated image
+  const selectAiImage = (url: string) => {
+    setImageUrl(url)
+    setActiveTab('upload') // Switch back to upload tab to show the selected image
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -370,7 +607,7 @@ function AvatarModal({
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold text-gray-900">
             {isEditing ? 'Modifier l\'avatar' : 'Nouvel avatar'}
@@ -396,85 +633,355 @@ function AvatarModal({
             />
           </div>
 
-          {/* Voice URL */}
+          {/* Voice Section with Tabs */}
           <div className="space-y-2">
-            <Label>Voix de référence (MP3) *</Label>
-            <div className="flex gap-2">
-              <Input
-                value={voiceUrl}
-                onChange={(e) => setVoiceUrl(e.target.value)}
-                placeholder="URL du fichier MP3 ou uploadez..."
-                className="flex-1"
-                disabled={saving}
-              />
-              <label className="cursor-pointer">
-                <Button type="button" variant="outline" disabled={uploading || saving} asChild>
-                  <span>{uploading ? '...' : 'Upload'}</span>
-                </Button>
-                <input
-                  type="file"
-                  accept="audio/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0]
-                    if (file) handleFileUpload(file, 'voice')
-                  }}
-                />
-              </label>
-            </div>
-            {voiceUrl && (
-              <audio src={voiceUrl} controls className="w-full h-10 mt-2" />
-            )}
-            <p className="text-xs text-gray-500">
-              Astuce: Utilisez une URL publique comme https://dataiads-test1.fr/sudouest/voix.mp3
-            </p>
+            <Label>Voix de référence *</Label>
+            
+            <Tabs value={voiceTab} onValueChange={(v) => setVoiceTab(v as 'upload' | 'record')}>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="upload" className="flex items-center gap-2">
+                  <Upload className="h-4 w-4" />
+                  Upload fichier
+                </TabsTrigger>
+                <TabsTrigger value="record" className="flex items-center gap-2">
+                  <Mic className="h-4 w-4" />
+                  Enregistrer
+                </TabsTrigger>
+              </TabsList>
+
+              {/* Upload Tab */}
+              <TabsContent value="upload" className="space-y-3 mt-4">
+                <div className="flex gap-2">
+                  <Input
+                    value={voiceUrl}
+                    onChange={(e) => setVoiceUrl(e.target.value)}
+                    placeholder="URL du fichier MP3 ou uploadez..."
+                    className="flex-1"
+                    disabled={saving}
+                  />
+                  <label className="cursor-pointer">
+                    <Button type="button" variant="outline" disabled={uploading || saving} asChild>
+                      <span>{uploading ? '...' : 'Upload'}</span>
+                    </Button>
+                    <input
+                      type="file"
+                      accept="audio/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) handleFileUpload(file, 'voice')
+                      }}
+                    />
+                  </label>
+                </div>
+                {voiceUrl && (
+                  <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg border border-green-200">
+                    <Volume2 className="h-5 w-5 text-green-600" />
+                    <audio src={voiceUrl} controls className="flex-1 h-10" />
+                  </div>
+                )}
+              </TabsContent>
+
+              {/* Record Tab */}
+              <TabsContent value="record" className="space-y-4 mt-4">
+                <div className="p-4 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg border border-blue-200">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Mic className="h-5 w-5 text-blue-600" />
+                    <h4 className="font-semibold text-blue-900">Enregistrement vocal</h4>
+                  </div>
+                  
+                  {/* Sample text to read */}
+                  <div className="mb-4">
+                    <Label className="text-blue-900 mb-2 block">Texte à lire :</Label>
+                    <div className="p-3 bg-white rounded-lg border border-blue-200 text-sm text-gray-700 leading-relaxed">
+                      {sampleText}
+                    </div>
+                    <p className="text-xs text-blue-600 mt-2">
+                      💡 Lisez ce texte naturellement pour créer un échantillon de voix de qualité
+                    </p>
+                  </div>
+
+                  {/* Mic permission warning */}
+                  {micPermission === 'denied' && (
+                    <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                      ⚠️ Accès au microphone refusé. Veuillez autoriser l'accès dans les paramètres de votre navigateur.
+                    </div>
+                  )}
+
+                  {/* Recording controls */}
+                  <div className="flex items-center gap-4">
+                    {!isRecording ? (
+                      <Button
+                        type="button"
+                        onClick={startRecording}
+                        disabled={uploading}
+                        className="bg-blue-600 hover:bg-blue-700"
+                      >
+                        <Mic className="mr-2 h-4 w-4" />
+                        Commencer l'enregistrement
+                      </Button>
+                    ) : (
+                      <Button
+                        type="button"
+                        onClick={stopRecording}
+                        variant="destructive"
+                        className="animate-pulse"
+                      >
+                        <Square className="mr-2 h-4 w-4" />
+                        Arrêter ({formatTime(recordingTime)})
+                      </Button>
+                    )}
+                    
+                    {isRecording && (
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
+                        <span className="text-sm font-medium text-red-600">Enregistrement en cours...</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Recorded audio preview */}
+                  {recordedUrl && !isRecording && (
+                    <div className="mt-4 space-y-3">
+                      <div className="flex items-center gap-3 p-3 bg-white rounded-lg border border-blue-200">
+                        <Play className="h-5 w-5 text-blue-600" />
+                        <audio src={recordedUrl} controls className="flex-1 h-10" />
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          onClick={uploadRecording}
+                          disabled={uploading}
+                          className="flex-1 bg-green-600 hover:bg-green-700"
+                        >
+                          {uploading ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Upload en cours...
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="mr-2 h-4 w-4" />
+                              Utiliser cet enregistrement
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            setRecordedBlob(null)
+                            if (recordedUrl) URL.revokeObjectURL(recordedUrl)
+                            setRecordedUrl(null)
+                            setRecordingTime(0)
+                          }}
+                          disabled={uploading}
+                        >
+                          Recommencer
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Show uploaded voice if available */}
+                {voiceUrl && (
+                  <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg border border-green-200">
+                    <span className="text-green-600 font-medium">✓ Voix enregistrée</span>
+                    <audio src={voiceUrl} controls className="flex-1 h-10" />
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
           </div>
 
-          {/* Image URL */}
+          {/* Image Section with Tabs */}
           <div className="space-y-2">
-            <Label>Image de l'avatar (PNG, JPG) *</Label>
-            <div className="flex gap-2">
-              <Input
-                value={imageUrl}
-                onChange={(e) => setImageUrl(e.target.value)}
-                placeholder="URL de l'image ou uploadez..."
-                className="flex-1"
-                disabled={saving}
-              />
-              <label className="cursor-pointer">
-                <Button type="button" variant="outline" disabled={uploading || saving} asChild>
-                  <span>{uploading ? '...' : 'Upload'}</span>
-                </Button>
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0]
-                    if (file) handleFileUpload(file, 'image')
-                  }}
-                />
-              </label>
-            </div>
-            {imageUrl && (
-              <div className="mt-2 w-20 h-20 rounded-lg overflow-hidden border border-gray-200">
-                <img 
-                  src={imageUrl} 
-                  alt="Aperçu" 
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none'
-                  }}
-                />
-              </div>
-            )}
-            <p className="text-xs text-gray-500">
-              Astuce: Utilisez une URL publique comme https://dataiads-test1.fr/sudouest/avatarsudsouest.png
-            </p>
+            <Label>Image de l'avatar *</Label>
+            
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'upload' | 'ai')}>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="upload" className="flex items-center gap-2">
+                  <Upload className="h-4 w-4" />
+                  Upload direct
+                </TabsTrigger>
+                <TabsTrigger value="ai" className="flex items-center gap-2">
+                  <Wand2 className="h-4 w-4" />
+                  AI Maker
+                </TabsTrigger>
+              </TabsList>
+
+              {/* Upload Tab */}
+              <TabsContent value="upload" className="space-y-4 mt-4">
+                <div className="flex gap-2">
+                  <Input
+                    value={imageUrl}
+                    onChange={(e) => setImageUrl(e.target.value)}
+                    placeholder="URL de l'image ou uploadez..."
+                    className="flex-1"
+                    disabled={saving}
+                  />
+                  <label className="cursor-pointer">
+                    <Button type="button" variant="outline" disabled={uploading || saving} asChild>
+                      <span>{uploading ? '...' : 'Upload'}</span>
+                    </Button>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) handleFileUpload(file, 'image')
+                      }}
+                    />
+                  </label>
+                </div>
+                {imageUrl && (
+                  <div className="flex items-center gap-4">
+                    <div className="w-24 h-24 rounded-lg overflow-hidden border-2 border-[#D42E1B]">
+                      <img 
+                        src={imageUrl} 
+                        alt="Aperçu" 
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = 'https://via.placeholder.com/96?text=Error'
+                        }}
+                      />
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      <p className="font-medium text-green-600">✓ Image sélectionnée</p>
+                      <p className="text-xs truncate max-w-[200px]">{imageUrl}</p>
+                    </div>
+                  </div>
+                )}
+              </TabsContent>
+
+              {/* AI Maker Tab */}
+              <TabsContent value="ai" className="space-y-4 mt-4">
+                <div className="p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg border border-purple-200">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Sparkles className="h-5 w-5 text-purple-600" />
+                    <h4 className="font-semibold text-purple-900">Avatar AI Maker</h4>
+                  </div>
+                  <p className="text-sm text-purple-700 mb-4">
+                    Uploadez une ou plusieurs photos de référence et décrivez l'avatar que vous souhaitez créer.
+                  </p>
+
+                  {/* Source Images */}
+                  <div className="space-y-2 mb-4">
+                    <Label className="text-purple-900">Images sources *</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {aiSourceImages.map((url, idx) => (
+                        <div key={idx} className="relative w-16 h-16 rounded-lg overflow-hidden border border-purple-300">
+                          <img src={url} alt={`Source ${idx + 1}`} className="w-full h-full object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => setAiSourceImages(prev => prev.filter((_, i) => i !== idx))}
+                            className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                      <label className="w-16 h-16 rounded-lg border-2 border-dashed border-purple-300 flex items-center justify-center cursor-pointer hover:border-purple-500 hover:bg-purple-50 transition-colors">
+                        <Plus className="h-6 w-6 text-purple-400" />
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          disabled={uploading}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            if (file) handleAiSourceUpload(file)
+                          }}
+                        />
+                      </label>
+                    </div>
+                    <p className="text-xs text-purple-600">
+                      Ajoutez des photos de la personne pour créer un avatar ressemblant
+                    </p>
+                  </div>
+
+                  {/* Prompt */}
+                  <div className="space-y-2 mb-4">
+                    <Label className="text-purple-900">Description / Prompt *</Label>
+                    <Textarea
+                      value={aiPrompt}
+                      onChange={(e) => setAiPrompt(e.target.value)}
+                      placeholder="Ex: portrait professionnel d'un présentateur TV en costume, fond neutre, éclairage studio..."
+                      className="min-h-[80px]"
+                    />
+                  </div>
+
+                  {/* Resolution */}
+                  <div className="space-y-2 mb-4">
+                    <Label className="text-purple-900">Résolution</Label>
+                    <Select value={aiResolution} onValueChange={(v) => setAiResolution(v as '1K' | '2K' | '4K')}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1K">1K (rapide)</SelectItem>
+                        <SelectItem value="2K">2K (standard)</SelectItem>
+                        <SelectItem value="4K">4K (haute qualité)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Generate Button */}
+                  <Button
+                    type="button"
+                    onClick={handleAiGenerate}
+                    disabled={aiGenerating || aiSourceImages.length === 0 || !aiPrompt.trim()}
+                    className="w-full bg-purple-600 hover:bg-purple-700"
+                  >
+                    {aiGenerating ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Génération en cours... (30-60s)
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="mr-2 h-4 w-4" />
+                        Générer 4 variantes
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+                {/* Generated Images */}
+                {aiGeneratedImages.length > 0 && (
+                  <div className="space-y-2">
+                    <Label>Résultats - Cliquez pour sélectionner</Label>
+                    <div className="grid grid-cols-2 gap-3">
+                      {aiGeneratedImages.map((img, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => selectAiImage(img.url)}
+                          className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all hover:scale-105 ${
+                            imageUrl === img.url ? 'border-[#D42E1B] ring-2 ring-[#D42E1B]' : 'border-gray-200 hover:border-purple-400'
+                          }`}
+                        >
+                          <img src={img.url} alt={`Généré ${idx + 1}`} className="w-full h-full object-cover" />
+                          {imageUrl === img.url && (
+                            <div className="absolute inset-0 bg-[#D42E1B]/20 flex items-center justify-center">
+                              <span className="bg-[#D42E1B] text-white px-2 py-1 rounded text-xs font-medium">
+                                ✓ Sélectionné
+                              </span>
+                            </div>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
           </div>
 
           {/* Actions */}
-          <div className="flex gap-3 pt-4">
+          <div className="flex gap-3 pt-4 border-t">
             <Button
               type="button"
               variant="outline"
@@ -495,7 +1002,7 @@ function AvatarModal({
                   Enregistrement...
                 </>
               ) : (
-                isEditing ? 'Enregistrer' : 'Créer'
+                isEditing ? 'Enregistrer' : 'Créer l\'avatar'
               )}
             </Button>
           </div>

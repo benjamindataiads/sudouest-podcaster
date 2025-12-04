@@ -223,6 +223,8 @@ async function addFadesToVideo(
         '-crf', '23',
         '-c:a', 'aac',
         '-b:a', '128k',
+        '-ar', '44100',
+        '-ac', '2', // Force stereo
         '-pix_fmt', 'yuv420p',
       ])
       .output(outputPath)
@@ -294,6 +296,8 @@ export async function concatenateVideos(videoUrls: string[], withTransition: boo
           '-c:a', 'aac',
           '-b:a', '128k',
           '-ar', '44100',
+          '-ac', '2', // Force stereo (2 channels)
+          '-af', 'loudnorm=I=-16:TP=-1.5:LRA=11', // EBU R128 loudness normalization
           '-pix_fmt', 'yuv420p',
         ])
         .output(normalizedPath)

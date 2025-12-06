@@ -88,6 +88,71 @@ export async function register() {
       `)
       console.log('✅ Assigned unowned avatars to Benjamin')
 
+      // ============================================
+      // ORGANIZATIONS FEATURE MIGRATIONS
+      // ============================================
+
+      // Create organization_settings table
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS organization_settings (
+          id SERIAL PRIMARY KEY,
+          org_id VARCHAR(255) NOT NULL UNIQUE,
+          name VARCHAR(255) NOT NULL,
+          branding JSONB,
+          created_at TIMESTAMP DEFAULT NOW() NOT NULL,
+          updated_at TIMESTAMP DEFAULT NOW() NOT NULL
+        )
+      `)
+      console.log('✅ organization_settings table verified')
+
+      // Create rss_feeds table
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS rss_feeds (
+          id SERIAL PRIMARY KEY,
+          org_id VARCHAR(255) NOT NULL,
+          name VARCHAR(255) NOT NULL,
+          url TEXT NOT NULL,
+          is_active BOOLEAN DEFAULT TRUE,
+          last_fetched_at TIMESTAMP,
+          created_at TIMESTAMP DEFAULT NOW() NOT NULL,
+          updated_at TIMESTAMP DEFAULT NOW() NOT NULL
+        )
+      `)
+      await db.execute(sql`
+        CREATE INDEX IF NOT EXISTS rss_feeds_org_id_idx ON rss_feeds(org_id)
+      `)
+      console.log('✅ rss_feeds table verified')
+
+      // Add org_id column to podcasts if it doesn't exist
+      await db.execute(sql`
+        DO $$ 
+        BEGIN 
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name = 'podcasts' AND column_name = 'org_id'
+          ) THEN 
+            ALTER TABLE podcasts ADD COLUMN org_id VARCHAR(255);
+            CREATE INDEX IF NOT EXISTS podcasts_org_id_idx ON podcasts(org_id);
+          END IF;
+        END $$;
+      `)
+      console.log('✅ podcasts.org_id column verified')
+
+      // Add org_id column to avatars if it doesn't exist
+      await db.execute(sql`
+        DO $$ 
+        BEGIN 
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name = 'avatars' AND column_name = 'org_id'
+          ) THEN 
+            ALTER TABLE avatars ADD COLUMN org_id VARCHAR(255);
+            CREATE INDEX IF NOT EXISTS avatars_org_id_idx ON avatars(org_id);
+          END IF;
+        END $$;
+      `)
+      console.log('✅ avatars.org_id column verified')
+
       console.log('✅ Database migrations completed successfully')
     } catch (error) {
       console.error('⚠️ Migration error (non-blocking):', error)

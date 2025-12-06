@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS "audio_jobs" (
 	"id" varchar(100) PRIMARY KEY NOT NULL,
 	"podcast_id" integer,
 	"script_chunks" jsonb,
-	"voice_id" varchar(100) NOT NULL,
+	"voice_id" text NOT NULL,
 	"status" varchar(50) DEFAULT 'queued' NOT NULL,
 	"audio_url" text,
 	"audio_chunks" jsonb,
@@ -39,9 +39,12 @@ CREATE TABLE IF NOT EXISTS "audio_jobs" (
 --> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "avatars" (
 	"id" serial PRIMARY KEY NOT NULL,
+	"user_id" varchar(255),
+	"org_id" varchar(255),
 	"name" varchar(100) NOT NULL,
 	"voice_url" text NOT NULL,
 	"image_url" text NOT NULL,
+	"image_variations" jsonb,
 	"is_default" boolean DEFAULT false,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL
@@ -58,8 +61,20 @@ CREATE TABLE IF NOT EXISTS "categories" (
 	CONSTRAINT "categories_slug_unique" UNIQUE("slug")
 );
 --> statement-breakpoint
+CREATE TABLE IF NOT EXISTS "organization_settings" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"org_id" varchar(255) NOT NULL,
+	"name" varchar(255) NOT NULL,
+	"branding" jsonb,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT "organization_settings_org_id_unique" UNIQUE("org_id")
+);
+--> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "podcasts" (
 	"id" serial PRIMARY KEY NOT NULL,
+	"user_id" varchar(255),
+	"org_id" varchar(255),
 	"title" text NOT NULL,
 	"date" timestamp DEFAULT now() NOT NULL,
 	"status" varchar(50) DEFAULT 'draft' NOT NULL,
@@ -76,6 +91,17 @@ CREATE TABLE IF NOT EXISTS "podcasts" (
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL,
 	"completed_at" timestamp
+);
+--> statement-breakpoint
+CREATE TABLE IF NOT EXISTS "rss_feeds" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"org_id" varchar(255) NOT NULL,
+	"name" varchar(255) NOT NULL,
+	"url" text NOT NULL,
+	"is_active" boolean DEFAULT true,
+	"last_fetched_at" timestamp,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "video_files" (
@@ -97,6 +123,7 @@ CREATE TABLE IF NOT EXISTS "video_jobs" (
 	"audio_url" text NOT NULL,
 	"text" text,
 	"section" varchar(50),
+	"avatar_image_url" text,
 	"status" varchar(50) DEFAULT 'queued' NOT NULL,
 	"video_url" text,
 	"error" text,

@@ -26,11 +26,51 @@ export interface AudioChunk {
 }
 
 /**
+ * Organization branding settings type
+ */
+export interface OrganizationBranding {
+  logoUrl?: string
+  primaryColor: string      // Color 1
+  secondaryColor: string    // Color 2
+  accentColor: string       // Accent color
+  textColor: string         // Text color
+  fontFamily: string        // Font family
+}
+
+/**
+ * Table pour stocker les paramètres des organisations
+ * L'orgId vient de Clerk Organizations
+ */
+export const organizationSettings = pgTable('organization_settings', {
+  id: serial('id').primaryKey(),
+  orgId: varchar('org_id', { length: 255 }).notNull().unique(), // Clerk Organization ID
+  name: varchar('name', { length: 255 }).notNull(), // Organization display name
+  branding: jsonb('branding').$type<OrganizationBranding>(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+})
+
+/**
+ * Table pour stocker les flux RSS par organisation
+ */
+export const rssFeeds = pgTable('rss_feeds', {
+  id: serial('id').primaryKey(),
+  orgId: varchar('org_id', { length: 255 }).notNull(), // Clerk Organization ID
+  name: varchar('name', { length: 255 }).notNull(), // Feed display name
+  url: text('url').notNull(), // RSS feed URL
+  isActive: boolean('is_active').default(true),
+  lastFetchedAt: timestamp('last_fetched_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+})
+
+/**
  * Table pour stocker les projets de podcast
  */
 export const podcasts = pgTable('podcasts', {
   id: serial('id').primaryKey(),
   userId: varchar('user_id', { length: 255 }), // Clerk user ID for ownership
+  orgId: varchar('org_id', { length: 255 }), // Clerk Organization ID
   title: text('title').notNull(),
   date: timestamp('date').defaultNow().notNull(),
   status: varchar('status', { length: 50 }).notNull().default('draft'), // draft, articles_selected, script_ready, audio_generated, video_generating, video_generated, completed
@@ -180,6 +220,7 @@ export interface AvatarImageVariant {
 export const avatars = pgTable('avatars', {
   id: serial('id').primaryKey(),
   userId: varchar('user_id', { length: 255 }), // Clerk user ID for ownership (null for default avatars)
+  orgId: varchar('org_id', { length: 255 }), // Clerk Organization ID (null for global default avatars)
   name: varchar('name', { length: 100 }).notNull(),
   voiceUrl: text('voice_url').notNull(), // URL du fichier MP3 de référence pour le clonage vocal
   imageUrl: text('image_url').notNull(), // URL de l'image principale de l'avatar
@@ -205,4 +246,8 @@ export type VideoJob = typeof videoJobs.$inferSelect
 export type NewVideoJob = typeof videoJobs.$inferInsert
 export type Avatar = typeof avatars.$inferSelect
 export type NewAvatar = typeof avatars.$inferInsert
+export type OrganizationSetting = typeof organizationSettings.$inferSelect
+export type NewOrganizationSetting = typeof organizationSettings.$inferInsert
+export type RssFeed = typeof rssFeeds.$inferSelect
+export type NewRssFeed = typeof rssFeeds.$inferInsert
 

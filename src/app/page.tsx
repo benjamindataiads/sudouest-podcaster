@@ -5,10 +5,9 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import SudOuestLogo from '@/components/ui/SudOuestLogo'
+import Sidebar from '@/components/layout/Sidebar'
 import CreatePodcastDialog from '@/components/features/CreatePodcastDialog'
-import { Play, Film, Loader2, Plus, Clock, Edit2, ChevronDown, ChevronUp, Trash2, ChevronLeft, ChevronRight } from 'lucide-react'
-import AuthButtons from '@/components/features/AuthButtons'
+import { Play, Film, Loader2, Plus, Clock, Edit2, ChevronDown, ChevronUp, Trash2, ChevronLeft, ChevronRight, Mic } from 'lucide-react'
 
 interface Podcast {
   id: number
@@ -75,26 +74,26 @@ function DateSlider({
   }, [])
 
   return (
-    <div className="mb-10">
+    <div className="mb-8">
       {/* Date Title */}
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-gray-800 capitalize flex items-center gap-3">
-          <span className="w-1 h-6 bg-[#D42E1B] rounded-full"></span>
+        <h3 className="text-base font-medium text-gray-700 capitalize flex items-center gap-3">
+          <span className="w-1 h-5 bg-purple-500 rounded-full"></span>
           {date}
-          <span className="text-sm font-normal text-gray-500">({podcasts.length})</span>
+          <span className="text-sm font-normal text-gray-400">({podcasts.length})</span>
         </h3>
         <div className="flex gap-2">
           <button
             onClick={() => scroll('left')}
-            className="p-2 rounded-full bg-white shadow-md hover:bg-gray-50 transition-colors border border-gray-200"
+            className="p-2 rounded-full bg-white shadow-sm hover:bg-gray-50 transition-colors border border-gray-200"
           >
-            <ChevronLeft className="w-5 h-5 text-gray-600" />
+            <ChevronLeft className="w-4 h-4 text-gray-500" />
           </button>
           <button
             onClick={() => scroll('right')}
-            className="p-2 rounded-full bg-white shadow-md hover:bg-gray-50 transition-colors border border-gray-200"
+            className="p-2 rounded-full bg-white shadow-sm hover:bg-gray-50 transition-colors border border-gray-200"
           >
-            <ChevronRight className="w-5 h-5 text-gray-600" />
+            <ChevronRight className="w-4 h-4 text-gray-500" />
           </button>
         </div>
       </div>
@@ -141,9 +140,9 @@ function PodcastCard({
   getStepNumber: (status: string) => number
 }) {
   return (
-    <Card className="flex-shrink-0 w-72 overflow-hidden hover:shadow-xl transition-all duration-300 group border-2 border-transparent hover:border-[#D42E1B]/20">
+    <Card className="flex-shrink-0 w-72 overflow-hidden hover:shadow-lg transition-all duration-300 group border border-gray-200 hover:border-purple-300">
       {/* Video/Thumbnail Preview */}
-      <div className="relative h-40 bg-gradient-to-br from-gray-100 to-gray-200 overflow-hidden">
+      <div className="relative h-40 bg-gradient-to-br from-gray-50 to-gray-100 overflow-hidden">
         {podcast.finalVideoUrl ? (
           <video
             src={podcast.finalVideoUrl}
@@ -162,14 +161,14 @@ function PodcastCard({
             <div className={`w-16 h-16 rounded-full flex items-center justify-center ${
               podcast.status === 'completed' ? 'bg-green-100' :
               podcast.status.includes('generating') ? 'bg-yellow-100 animate-pulse' :
-              'bg-white'
+              'bg-white border border-gray-200'
             }`}>
               {podcast.videoUrls?.length ? (
-                <Film className="h-8 w-8 text-gray-600" />
+                <Film className="h-8 w-8 text-gray-500" />
               ) : podcast.audioChunks?.length ? (
-                <Play className="h-8 w-8 text-gray-600" />
+                <Play className="h-8 w-8 text-gray-500" />
               ) : (
-                <Edit2 className="h-8 w-8 text-gray-500" />
+                <Edit2 className="h-8 w-8 text-gray-400" />
               )}
             </div>
           </div>
@@ -183,7 +182,7 @@ function PodcastCard({
         </div>
         
         {/* Progress Dots */}
-        <div className="absolute bottom-3 left-3 flex items-center gap-1 bg-white/90 backdrop-blur-sm rounded-full px-2 py-1">
+        <div className="absolute bottom-3 left-3 flex items-center gap-1 bg-white/90 backdrop-blur-sm rounded-full px-2 py-1 border border-gray-100">
           {[1, 2, 3, 4].map((step) => (
             <div
               key={step}
@@ -191,8 +190,8 @@ function PodcastCard({
                 step <= getStepNumber(podcast.status)
                   ? podcast.status.includes('generating') && step === getStepNumber(podcast.status)
                     ? 'bg-yellow-500 animate-pulse'
-                    : 'bg-green-500'
-                  : 'bg-gray-300'
+                    : 'bg-purple-500'
+                  : 'bg-gray-200'
               }`}
             />
           ))}
@@ -213,7 +212,7 @@ function PodcastCard({
             </span>
           )}
           {podcast.finalVideoUrl && (
-            <span className="flex items-center gap-1 text-green-600">
+            <span className="flex items-center gap-1 text-purple-600">
               <Film className="h-3.5 w-3.5" />
               Vidéo
             </span>
@@ -223,13 +222,13 @@ function PodcastCard({
         {/* Actions */}
         <div className="flex items-center gap-2">
           <Link href={`/create?resume=${podcast.id}&step=${getStepNumber(podcast.status)}`} className="flex-1">
-            <Button size="sm" className="w-full bg-[#D42E1B] hover:bg-[#B01030] text-white">
+            <Button size="sm" className="w-full bg-gray-900 hover:bg-gray-800 text-white">
               {podcast.status === 'completed' ? 'Voir' : 'Reprendre'}
             </Button>
           </Link>
           {(podcast.audioChunks || podcast.videoUrls) && (
             <Link href={`/gallery?podcastId=${podcast.id}`}>
-              <Button size="sm" variant="outline" className="px-3">
+              <Button size="sm" variant="outline" className="px-3 border-gray-200">
                 <Film className="h-4 w-4" />
               </Button>
             </Link>
@@ -239,7 +238,7 @@ function PodcastCard({
             variant="ghost"
             onClick={() => onDelete(podcast.id)}
             disabled={deletingId === podcast.id}
-            className="px-3 text-red-600 hover:text-red-700 hover:bg-red-50"
+            className="px-3 text-red-500 hover:text-red-600 hover:bg-red-50"
           >
             {deletingId === podcast.id ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -274,12 +273,7 @@ function PodcastsByDate({
   const groupedPodcasts = groupPodcastsByDate(podcasts)
   
   return (
-    <div className="mb-16">
-      <h3 className="text-2xl font-bold text-gray-900 mb-8 flex items-center">
-        <span className="w-1 h-8 bg-[#D42E1B] mr-3"></span>
-        Mes podcasts ({podcasts.length})
-      </h3>
-      
+    <div>
       {Array.from(groupedPodcasts.entries()).map(([date, datePodcasts]) => (
         <DateSlider
           key={date}
@@ -380,158 +374,152 @@ export default function HomePage() {
   }
 
   const getStatusColor = (status: string) => {
-    if (status === 'completed') return 'bg-green-100 text-green-800'
-    if (status.includes('generating')) return 'bg-yellow-100 text-yellow-800'
-    if (status.includes('generated')) return 'bg-blue-100 text-blue-800'
-    return 'bg-gray-100 text-gray-800'
+    if (status === 'completed') return 'bg-green-100 text-green-700'
+    if (status.includes('generating')) return 'bg-yellow-100 text-yellow-700'
+    if (status.includes('generated')) return 'bg-purple-100 text-purple-700'
+    return 'bg-gray-100 text-gray-600'
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
-      {/* Header avec logo Sud-Ouest */}
-      <div className="bg-[#D42E1B] text-white">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <SudOuestLogo width={120} height={40} fill="white" />
-              <div className="hidden md:block h-8 w-px bg-white/30" />
-              <h1 className="text-2xl md:text-3xl font-bold">Podcaster</h1>
-            </div>
-            <div className="flex items-center gap-3">
-              <AuthButtons />
+    <div className="min-h-screen bg-gray-50">
+      {/* Sidebar */}
+      <Sidebar />
+
+      {/* Main Content */}
+      <main className="lg:ml-72 min-h-screen">
+        <div className="p-6 lg:p-8">
+          {/* Page Header */}
+          <div className="mb-8">
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">Mes podcasts</h1>
+            <p className="text-gray-500">Créez et gérez vos podcasts audio et vidéo</p>
+          </div>
+
+          {/* Create CTA */}
+          <div className="mb-8 p-6 bg-white rounded-xl border border-gray-200 shadow-sm">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
+                  <Mic className="h-6 w-6 text-purple-600" />
+                </div>
+                <div>
+                  <h2 className="font-semibold text-gray-900">Créer un nouveau podcast</h2>
+                  <p className="text-sm text-gray-500">Transformez l'actualité en contenu audio/vidéo</p>
+                </div>
+              </div>
+              <CreatePodcastDialog>
+                <Button className="bg-gray-900 hover:bg-gray-800 text-white">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Nouveau podcast
+                </Button>
+              </CreatePodcastDialog>
             </div>
           </div>
-        </div>
-      </div>
 
-      <div className="container mx-auto px-4 py-12">
-        {/* Hero CTA */}
-        <div className="text-center mb-12">
-          <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
-            Transformez l&apos;actualité en podcast
-          </h2>
-          <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
-            Créez des podcasts audio et vidéo professionnels à partir des articles de Sud-Ouest en quelques clics
-          </p>
-          <CreatePodcastDialog>
-            <Button size="lg" className="bg-[#D42E1B] hover:bg-[#B01030] text-white text-lg px-10 py-6 rounded-full shadow-lg">
-              <Plus className="h-5 w-5 mr-2" />
-              Créer un nouveau podcast
-            </Button>
-          </CreatePodcastDialog>
-        </div>
-
-        {/* Podcasts List */}
-        {loading ? (
-          <div className="flex justify-center items-center py-20">
-            <Loader2 className="h-12 w-12 animate-spin text-[#D42E1B]" />
-          </div>
-        ) : podcasts.length > 0 ? (
-          <PodcastsByDate 
-            podcasts={podcasts}
-            onDelete={handleDeletePodcast}
-            deletingId={deletingId}
-            onVideoClick={(url, title) => {
-              setSelectedVideo({ url, title })
-                                  setVideoDialogOpen(true)
-                                }}
-            getStatusLabel={getStatusLabel}
-            getStatusColor={getStatusColor}
-            getStepNumber={getStepNumber}
-          />
-        ) : (
-          <div className="text-center py-12 mb-16">
-            <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Film className="h-10 w-10 text-gray-400" />
+          {/* Podcasts List */}
+          {loading ? (
+            <div className="flex justify-center items-center py-20">
+              <Loader2 className="h-8 w-8 animate-spin text-purple-500" />
             </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">
-              Aucun podcast créé
-            </h3>
-            <p className="text-gray-600 mb-6">
-              Créez votre premier podcast en quelques clics
-            </p>
-            <CreatePodcastDialog>
-              <Button className="bg-[#D42E1B] hover:bg-[#B01030]">
-                <Plus className="h-4 w-4 mr-2" />
-                Créer mon premier podcast
-              </Button>
-            </CreatePodcastDialog>
-          </div>
-        )}
-
-        {/* Comment ça marche Section */}
-        <div className="mb-16">
-          <button
-            onClick={() => setShowHowItWorks(!showHowItWorks)}
-            className="w-full flex items-center justify-between p-4 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors mb-4"
-          >
-            <h3 className="text-xl font-bold text-gray-900 flex items-center">
-              <span className="w-1 h-6 bg-[#D42E1B] mr-3"></span>
-              Comment ça marche ?
-            </h3>
-            {showHowItWorks ? (
-              <ChevronUp className="h-5 w-5 text-gray-600" />
-            ) : (
-              <ChevronDown className="h-5 w-5 text-gray-600" />
-            )}
-          </button>
-
-          {showHowItWorks && (
-            <div className="grid md:grid-cols-3 gap-6 animate-in fade-in duration-300">
-              <Card className="border-2 hover:border-[#D42E1B] transition-all">
-                <CardContent className="p-6 text-center">
-                  <div className="w-16 h-16 bg-[#D42E1B]/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <span className="text-3xl">📰</span>
-                  </div>
-                  <h3 className="font-bold text-lg mb-2">Sélection IA</h3>
-                  <p className="text-gray-600 text-sm">
-                    Intelligence artificielle pour sélectionner les meilleurs articles
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card className="border-2 hover:border-[#D42E1B] transition-all">
-                <CardContent className="p-6 text-center">
-                  <div className="w-16 h-16 bg-[#D42E1B]/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <span className="text-3xl">✍️</span>
-                  </div>
-                  <h3 className="font-bold text-lg mb-2">Script éditable</h3>
-                  <p className="text-gray-600 text-sm">
-                    Générez et personnalisez votre script de podcast
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card className="border-2 hover:border-[#D42E1B] transition-all">
-                <CardContent className="p-6 text-center">
-                  <div className="w-16 h-16 bg-[#D42E1B]/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <span className="text-3xl">🎥</span>
-                  </div>
-                  <h3 className="font-bold text-lg mb-2">Audio & Vidéo</h3>
-                  <p className="text-gray-600 text-sm">
-                    Production professionnelle avec voix clonée et avatar
-                  </p>
-                </CardContent>
-              </Card>
+          ) : podcasts.length > 0 ? (
+            <PodcastsByDate 
+              podcasts={podcasts}
+              onDelete={handleDeletePodcast}
+              deletingId={deletingId}
+              onVideoClick={(url, title) => {
+                setSelectedVideo({ url, title })
+                setVideoDialogOpen(true)
+              }}
+              getStatusLabel={getStatusLabel}
+              getStatusColor={getStatusColor}
+              getStepNumber={getStepNumber}
+            />
+          ) : (
+            <div className="text-center py-16 bg-white rounded-xl border border-gray-200">
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Film className="h-8 w-8 text-gray-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                Aucun podcast créé
+              </h3>
+              <p className="text-gray-500 mb-6">
+                Créez votre premier podcast en quelques clics
+              </p>
+              <CreatePodcastDialog>
+                <Button className="bg-gray-900 hover:bg-gray-800 text-white">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Créer mon premier podcast
+                </Button>
+              </CreatePodcastDialog>
             </div>
           )}
-        </div>
+
+          {/* Comment ça marche Section */}
+          <div className="mt-8">
+            <button
+              onClick={() => setShowHowItWorks(!showHowItWorks)}
+              className="w-full flex items-center justify-between p-4 bg-white hover:bg-gray-50 rounded-xl transition-colors border border-gray-200"
+            >
+              <h3 className="font-semibold text-gray-900 flex items-center">
+                <span className="w-1 h-5 bg-purple-500 mr-3 rounded-full"></span>
+                Comment ça marche ?
+              </h3>
+              {showHowItWorks ? (
+                <ChevronUp className="h-5 w-5 text-gray-400" />
+              ) : (
+                <ChevronDown className="h-5 w-5 text-gray-400" />
+              )}
+            </button>
+
+            {showHowItWorks && (
+              <div className="grid md:grid-cols-3 gap-4 mt-4 animate-in fade-in duration-300">
+                <Card className="border border-gray-200 hover:border-purple-300 transition-all">
+                  <CardContent className="p-6 text-center">
+                    <div className="w-14 h-14 bg-purple-100 rounded-xl flex items-center justify-center mx-auto mb-4">
+                      <span className="text-2xl">📰</span>
+                    </div>
+                    <h3 className="font-semibold mb-2">Sélection IA</h3>
+                    <p className="text-gray-500 text-sm">
+                      L'IA sélectionne les meilleurs articles
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card className="border border-gray-200 hover:border-purple-300 transition-all">
+                  <CardContent className="p-6 text-center">
+                    <div className="w-14 h-14 bg-purple-100 rounded-xl flex items-center justify-center mx-auto mb-4">
+                      <span className="text-2xl">✍️</span>
+                    </div>
+                    <h3 className="font-semibold mb-2">Script éditable</h3>
+                    <p className="text-gray-500 text-sm">
+                      Personnalisez votre script de podcast
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card className="border border-gray-200 hover:border-purple-300 transition-all">
+                  <CardContent className="p-6 text-center">
+                    <div className="w-14 h-14 bg-purple-100 rounded-xl flex items-center justify-center mx-auto mb-4">
+                      <span className="text-2xl">🎥</span>
+                    </div>
+                    <h3 className="font-semibold mb-2">Audio & Vidéo</h3>
+                    <p className="text-gray-500 text-sm">
+                      Production avec voix clonée et avatar
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
           </div>
 
-      {/* Footer */}
-      <footer className="bg-gray-900 text-white mt-20">
-        <div className="container mx-auto px-4 py-8">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <SudOuestLogo width={100} height={32} fill="white" className="opacity-80" />
-              <span className="text-sm text-gray-400">Podcaster © 2025</span>
+          {/* Footer */}
+          <footer className="mt-12 pt-6 border-t border-gray-200">
+            <div className="flex items-center justify-between text-sm text-gray-400">
+              <span>Podcaster © 2025</span>
+              <span>POC Propulsé par l'IA et Carole Fourcade</span>
             </div>
-            <div className="text-sm text-gray-400">
-              POC Propulsé par l&apos;IA et Carole Fourcade
-            </div>
-          </div>
+          </footer>
         </div>
-      </footer>
+      </main>
 
       {/* Dialog vidéo */}
       <Dialog open={videoDialogOpen} onOpenChange={setVideoDialogOpen}>
@@ -553,7 +541,6 @@ export default function HomePage() {
           )}
         </DialogContent>
       </Dialog>
-    </main>
+    </div>
   )
 }
-

@@ -16,26 +16,41 @@ const DEFAULT_AVATAR = {
 
 /**
  * GET /api/avatars
- * Get avatars: default avatars + user's custom avatars
+ * Get avatars: default avatars + org/user's custom avatars
  */
 export async function GET() {
   try {
-    const { userId } = await auth()
+    const { userId, orgId } = await auth()
     
     if (!userId) {
       return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
     }
 
-    // Get default avatars (isDefault=true) and user's custom avatars
-    let allAvatars = await db
-      .select()
-      .from(avatars)
-      .where(or(
-        eq(avatars.isDefault, true),
-        eq(avatars.userId, userId),
-        isNull(avatars.userId) // Legacy avatars without userId
-      ))
-      .orderBy(avatars.createdAt)
+    let allAvatars
+
+    if (orgId) {
+      // Org mode: show default + org's avatars + legacy avatars
+      allAvatars = await db
+        .select()
+        .from(avatars)
+        .where(or(
+          eq(avatars.isDefault, true),
+          eq(avatars.orgId, orgId),
+          isNull(avatars.orgId) // Legacy avatars without orgId
+        ))
+        .orderBy(avatars.createdAt)
+    } else {
+      // Personal mode: show default + user's personal avatars (no org)
+      allAvatars = await db
+        .select()
+        .from(avatars)
+        .where(or(
+          eq(avatars.isDefault, true),
+          eq(avatars.userId, userId),
+          isNull(avatars.userId) // Legacy avatars
+        ))
+        .orderBy(avatars.createdAt)
+    }
     
     // If no avatars exist, create the default one
     if (allAvatars.length === 0) {
@@ -48,7 +63,7 @@ export async function GET() {
       console.log('✅ Created default avatar: Benoit Lasserre')
     }
     
-    return NextResponse.json({ avatars: allAvatars })
+    return NextResponse.json({ avatars: allAvatars, orgId })
   } catch (error) {
     console.error('Error fetching avatars:', error)
     return NextResponse.json(
@@ -60,11 +75,11 @@ export async function GET() {
 
 /**
  * POST /api/avatars
- * Create a new avatar for the current user
+ * Create a new avatar for the current user/org
  */
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await auth()
+    const { userId, orgId } = await auth()
     
     if (!userId) {
       return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
@@ -84,6 +99,7 @@ export async function POST(request: NextRequest) {
       .insert(avatars)
       .values({
         userId, // Associate with current user
+        orgId: orgId || undefined, // Associate with org if selected
         name,
         voiceUrl,
         imageUrl,
@@ -92,7 +108,7 @@ export async function POST(request: NextRequest) {
       })
       .returning()
     
-    console.log(`✅ Created avatar: ${name} for user: ${userId} with ${imageVariations?.length || 0} variations`)
+    console.log(`✅ Created avatar: ${name} for user: ${userId} org: ${orgId} with ${imageVariations?.length || 0} variations`)
     
     return NextResponse.json({ avatar: newAvatar })
   } catch (error) {

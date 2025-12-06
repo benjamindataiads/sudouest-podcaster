@@ -7,14 +7,14 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
-import SudOuestLogo from '@/components/ui/SudOuestLogo'
+import Sidebar from '@/components/layout/Sidebar'
 import StepOne from '@/components/features/StepOne'
 import StepTwo from '@/components/features/StepTwo'
 import StepThree from '@/components/features/StepThree'
 import StepFour from '@/components/features/StepFour'
 import { ArticleWithScore, PodcastScript } from '@/types'
 import { AudioChunk } from '@/lib/genai/types'
-import { Loader2, FileText, Video, Newspaper, CheckCircle2, Home, Mic, Film } from 'lucide-react'
+import { Loader2, FileText, Video, Newspaper, CheckCircle2, Mic, Film } from 'lucide-react'
 
 interface ImageVariation {
   url: string
@@ -425,238 +425,236 @@ function CreatePodcastPageContent() {
 
   if (loadingResume) {
     return (
-      <main className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="h-12 w-12 animate-spin text-[#D42E1B] mx-auto mb-4" />
+          <Loader2 className="h-12 w-12 animate-spin text-purple-500 mx-auto mb-4" />
           <p className="text-gray-600">Chargement du podcast...</p>
         </div>
-      </main>
+      </div>
     )
   }
 
   return (
-    <main className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-[#D42E1B] text-white shadow-lg">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link href="/" className="cursor-pointer hover:opacity-80 transition-opacity">
-                <SudOuestLogo width={100} height={32} fill="white" />
-              </Link>
-              <div className="hidden md:block h-6 w-px bg-white/30" />
-              <h1 className="text-xl md:text-2xl font-bold">
+    <div className="min-h-screen bg-gray-50">
+      <Sidebar />
+
+      <main className="lg:ml-72 min-h-screen">
+        <div className="p-6 lg:p-8">
+          {/* Page Header */}
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">
                 {resumeId ? 'Reprendre le podcast' : 'Créer un podcast'}
               </h1>
+              <p className="text-gray-500">Suivez les étapes pour créer votre podcast</p>
             </div>
-            <Link href="/">
-              <Button variant="ghost" size="sm" className="text-white hover:bg-white/20 border border-white/30">
-                <Home className="h-4 w-4 mr-2" />
-                Accueil
-              </Button>
-            </Link>
             {podcastId && (
               <div className="flex items-center gap-2">
-              <span className="text-xs bg-white/20 px-3 py-1 rounded-full">
+                <span className="text-xs bg-gray-100 px-3 py-1.5 rounded-full text-gray-600">
                   Podcast #{podcastId}
                 </span>
                 {audioJobId && audioProgress.total > 0 && audioProgress.completed < audioProgress.total && (
-                  <span className="flex items-center gap-2 text-xs px-3 py-1 rounded-full bg-orange-500 text-white animate-pulse">
+                  <span className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-full bg-orange-100 text-orange-700 animate-pulse">
                     <Loader2 className="h-3 w-3 animate-spin" />
-                    🎤 Audio en cours: {audioProgress.completed}/{audioProgress.total}
+                    🎤 Audio: {audioProgress.completed}/{audioProgress.total}
                   </span>
                 )}
                 {audioProgress.total > 0 && audioProgress.completed === audioProgress.total && (
-                  <span className="flex items-center gap-1 text-xs px-3 py-1 rounded-full bg-green-500 text-white">
+                  <span className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-full bg-green-100 text-green-700">
                     ✓ Audio complet ({audioProgress.total})
-              </span>
+                  </span>
                 )}
               </div>
             )}
           </div>
-        </div>
-      </div>
 
-      <div className="container mx-auto px-4 py-6 max-w-7xl">
-
-        {/* Navigation horizontale des étapes */}
-        <div className="mb-6 bg-white border border-gray-200 rounded-lg shadow-sm">
-          <nav className="flex items-center">
-            {/* Étape 1 : Articles */}
-            <button
-              onClick={() => setCurrentStep('1')}
-              className={`
-                flex-1 px-6 py-4 flex items-center justify-center gap-3 transition-all border-r border-gray-200
-                ${currentStep === '1' 
-                  ? 'bg-gray-50 border-b-2 border-b-gray-900' 
-                  : selectedArticles.length > 0 
-                    ? 'hover:bg-gray-50 cursor-pointer' 
-                    : 'opacity-50 cursor-default'
-                }
-              `}
-            >
-              <Newspaper className={`h-5 w-5 ${currentStep === '1' ? 'text-gray-900' : 'text-gray-400'}`} />
-              <div className="text-left">
-                <div className={`text-sm font-medium ${currentStep === '1' ? 'text-gray-900' : 'text-gray-600'}`}>
-                  Articles
-                </div>
-                {selectedArticles.length > 0 && (
-                  <div className="text-xs text-gray-500 flex items-center gap-1">
-                    <CheckCircle2 className="h-3 w-3 text-green-600" />
-                    {selectedArticles.length} sélectionnés
+          {/* Navigation horizontale des étapes */}
+          <div className="mb-6 bg-white border border-gray-200 rounded-lg shadow-sm">
+            <nav className="flex items-center">
+              {/* Étape 1 : Articles */}
+              <button
+                onClick={() => setCurrentStep('1')}
+                className={`
+                  flex-1 px-6 py-4 flex items-center justify-center gap-3 transition-all border-r border-gray-200
+                  ${currentStep === '1' 
+                    ? 'bg-gray-50 border-b-2 border-b-gray-900' 
+                    : selectedArticles.length > 0 
+                      ? 'hover:bg-gray-50 cursor-pointer' 
+                      : 'opacity-50 cursor-default'
+                  }
+                `}
+              >
+                <Newspaper className={`h-5 w-5 ${currentStep === '1' ? 'text-gray-900' : 'text-gray-400'}`} />
+                <div className="text-left">
+                  <div className={`text-sm font-medium ${currentStep === '1' ? 'text-gray-900' : 'text-gray-600'}`}>
+                    Articles
                   </div>
-                )}
-              </div>
-            </button>
+                  {selectedArticles.length > 0 && (
+                    <div className="text-xs text-gray-500 flex items-center gap-1">
+                      <CheckCircle2 className="h-3 w-3 text-green-600" />
+                      {selectedArticles.length} sélectionnés
+                    </div>
+                  )}
+                </div>
+              </button>
 
-            {/* Étape 2 : Script */}
-            <button
-              onClick={() => (selectedArticles.length > 0 || script) && setCurrentStep('2')}
-              disabled={selectedArticles.length === 0 && !script}
-              className={`
-                flex-1 px-6 py-4 flex items-center justify-center gap-3 transition-all border-r border-gray-200
-                ${currentStep === '2' 
-                  ? 'bg-gray-50 border-b-2 border-b-gray-900' 
-                  : script 
-                    ? 'hover:bg-gray-50 cursor-pointer' 
-                    : selectedArticles.length > 0
-                      ? 'hover:bg-gray-50 cursor-pointer'
+              {/* Étape 2 : Script */}
+              <button
+                onClick={() => (selectedArticles.length > 0 || script) && setCurrentStep('2')}
+                disabled={selectedArticles.length === 0 && !script}
+                className={`
+                  flex-1 px-6 py-4 flex items-center justify-center gap-3 transition-all border-r border-gray-200
+                  ${currentStep === '2' 
+                    ? 'bg-gray-50 border-b-2 border-b-gray-900' 
+                    : script 
+                      ? 'hover:bg-gray-50 cursor-pointer' 
+                      : selectedArticles.length > 0
+                        ? 'hover:bg-gray-50 cursor-pointer'
+                        : 'opacity-40 cursor-not-allowed'
+                  }
+                `}
+              >
+                <FileText className={`h-5 w-5 ${currentStep === '2' ? 'text-gray-900' : script ? 'text-gray-400' : 'text-gray-300'}`} />
+                <div className="text-left">
+                  <div className={`text-sm font-medium ${currentStep === '2' ? 'text-gray-900' : 'text-gray-600'}`}>
+                    Script
+                  </div>
+                  {script && (
+                    <div className="text-xs text-gray-500 flex items-center gap-1">
+                      <CheckCircle2 className="h-3 w-3 text-green-600" />
+                      Généré
+                    </div>
+                  )}
+                </div>
+              </button>
+
+              {/* Étape 3 : Production (Audio + Vidéo) */}
+              <button
+                onClick={() => script && setCurrentStep('3')}
+                disabled={!script}
+                className={`
+                  flex-1 px-6 py-4 flex items-center justify-center gap-3 transition-all border-r border-gray-200
+                  ${currentStep === '3' || currentStep === '4'
+                    ? 'bg-gray-50 border-b-2 border-b-gray-900' 
+                    : script
+                      ? 'hover:bg-gray-50 cursor-pointer' 
                       : 'opacity-40 cursor-not-allowed'
-                }
-              `}
-            >
-              <FileText className={`h-5 w-5 ${currentStep === '2' ? 'text-gray-900' : script ? 'text-gray-400' : 'text-gray-300'}`} />
-              <div className="text-left">
-                <div className={`text-sm font-medium ${currentStep === '2' ? 'text-gray-900' : 'text-gray-600'}`}>
-                  Script
-                </div>
-                {script && (
-                  <div className="text-xs text-gray-500 flex items-center gap-1">
-                    <CheckCircle2 className="h-3 w-3 text-green-600" />
-                    Généré
+                  }
+                `}
+              >
+                <Video className={`h-5 w-5 ${currentStep === '3' || currentStep === '4' ? 'text-gray-900' : script ? 'text-gray-400' : 'text-gray-300'}`} />
+                <div className="text-left">
+                  <div className={`text-sm font-medium ${currentStep === '3' || currentStep === '4' ? 'text-gray-900' : 'text-gray-600'}`}>
+                    Production
                   </div>
-                )}
-              </div>
-            </button>
-
-            {/* Étape 3 : Production (Audio + Vidéo) */}
-            <button
-              onClick={() => script && setCurrentStep('3')}
-              disabled={!script}
-              className={`
-                flex-1 px-6 py-4 flex items-center justify-center gap-3 transition-all border-r border-gray-200
-                ${currentStep === '3' || currentStep === '4'
-                  ? 'bg-gray-50 border-b-2 border-b-gray-900' 
-                  : script
-                    ? 'hover:bg-gray-50 cursor-pointer' 
-                    : 'opacity-40 cursor-not-allowed'
-                }
-              `}
-            >
-              <Video className={`h-5 w-5 ${currentStep === '3' || currentStep === '4' ? 'text-gray-900' : script ? 'text-gray-400' : 'text-gray-300'}`} />
-              <div className="text-left">
-                <div className={`text-sm font-medium ${currentStep === '3' || currentStep === '4' ? 'text-gray-900' : 'text-gray-600'}`}>
-                  Production
-                </div>
-                {audioUrl === 'generating' && (
-                  <div className="text-xs text-orange-500 flex items-center gap-1">
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                    Audio...
-                  </div>
-                )}
-                {audioChunks.length > 0 && audioUrl !== 'generating' && (
-                  <div className="text-xs text-gray-500 flex items-center gap-1">
-                    <Mic className="h-3 w-3 text-green-600" />
-                    {audioChunks.length} audio
-                  </div>
-                )}
-              </div>
-            </button>
-
-            {/* Étape 4 : Galerie */}
-            {podcastId && (
-              <Link href={`/gallery?podcastId=${podcastId}`} className="flex-1">
-                <button className="w-full px-6 py-4 flex items-center justify-center gap-3 transition-all hover:bg-gray-50">
-                  <Film className="h-5 w-5 text-gray-400" />
-                  <div className="text-left">
-                    <div className="text-sm font-medium text-gray-600">
-                      Galerie
+                  {audioUrl === 'generating' && (
+                    <div className="text-xs text-orange-500 flex items-center gap-1">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Audio...
                     </div>
-                    <div className="text-xs text-gray-500">
-                      Assemblage
+                  )}
+                  {audioChunks.length > 0 && audioUrl !== 'generating' && (
+                    <div className="text-xs text-gray-500 flex items-center gap-1">
+                      <Mic className="h-3 w-3 text-green-600" />
+                      {audioChunks.length} audio
                     </div>
-                  </div>
-                </button>
-              </Link>
-            )}
-          </nav>
+                  )}
+                </div>
+              </button>
+
+              {/* Étape 4 : Galerie */}
+              {podcastId && (
+                <Link href={`/gallery?podcastId=${podcastId}`} className="flex-1">
+                  <button className="w-full px-6 py-4 flex items-center justify-center gap-3 transition-all hover:bg-gray-50">
+                    <Film className="h-5 w-5 text-gray-400" />
+                    <div className="text-left">
+                      <div className="text-sm font-medium text-gray-600">
+                        Galerie
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        Assemblage
+                      </div>
+                    </div>
+                  </button>
+                </Link>
+              )}
+            </nav>
+          </div>
+
+          {/* Content */}
+          <Tabs value={currentStep} onValueChange={(v) => setCurrentStep(v as '1' | '2' | '3' | '4')}>
+            <TabsList className="hidden">
+              <TabsTrigger value="1">Étape 1</TabsTrigger>
+              <TabsTrigger value="2">Étape 2</TabsTrigger>
+              <TabsTrigger value="3">Étape 3</TabsTrigger>
+              <TabsTrigger value="4">Étape 4</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="1">
+              <StepOne 
+                onComplete={handleStep1Complete} 
+                onSkipToCustomScript={() => {
+                  // Skip to step 2 with empty articles for custom script mode
+                  setSelectedArticles([])
+                  setCurrentStep('2')
+                }}
+              />
+            </TabsContent>
+
+            <TabsContent value="2">
+              <StepTwo 
+                selectedArticles={selectedArticles}
+                existingScript={script}
+                onComplete={handleStep2Complete}
+                onBack={() => setCurrentStep('1')}
+              />
+            </TabsContent>
+
+            <TabsContent value="3">
+              <StepFour 
+                audioUrl={audioUrl}
+                audioChunks={audioChunks}
+                podcastId={podcastId}
+                avatar={avatar}
+                onBack={() => setCurrentStep('2')}
+                onVideoGenerated={async (videoUrl: string) => {
+                  await savePodcast({
+                    status: 'video_generated',
+                    finalVideoUrl: videoUrl,
+                  })
+                }}
+                onVideosGenerated={async (videoUrls: string[]) => {
+                  await savePodcast({
+                    status: 'video_generated',
+                    videoUrls: videoUrls,
+                  })
+                }}
+              />
+            </TabsContent>
+          </Tabs>
+
+          {/* Footer */}
+          <footer className="mt-12 pt-6 border-t border-gray-200">
+            <div className="flex items-center justify-between text-sm text-gray-400">
+              <span>Podcaster © 2025</span>
+              <span>POC Propulsé par l'IA</span>
+            </div>
+          </footer>
         </div>
-
-        {/* Content */}
-        <Tabs value={currentStep} onValueChange={(v) => setCurrentStep(v as '1' | '2' | '3' | '4')}>
-          <TabsList className="hidden">
-            <TabsTrigger value="1">Étape 1</TabsTrigger>
-            <TabsTrigger value="2">Étape 2</TabsTrigger>
-            <TabsTrigger value="3">Étape 3</TabsTrigger>
-            <TabsTrigger value="4">Étape 4</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="1">
-            <StepOne 
-              onComplete={handleStep1Complete} 
-              onSkipToCustomScript={() => {
-                // Skip to step 2 with empty articles for custom script mode
-                setSelectedArticles([])
-                setCurrentStep('2')
-              }}
-            />
-          </TabsContent>
-
-          <TabsContent value="2">
-            <StepTwo 
-              selectedArticles={selectedArticles}
-              existingScript={script}
-              onComplete={handleStep2Complete}
-              onBack={() => setCurrentStep('1')}
-            />
-          </TabsContent>
-
-          <TabsContent value="3">
-            <StepFour 
-              audioUrl={audioUrl}
-              audioChunks={audioChunks}
-              podcastId={podcastId}
-              avatar={avatar}
-              onBack={() => setCurrentStep('2')}
-              onVideoGenerated={async (videoUrl: string) => {
-                await savePodcast({
-                  status: 'video_generated',
-                  finalVideoUrl: videoUrl,
-                })
-              }}
-              onVideosGenerated={async (videoUrls: string[]) => {
-                await savePodcast({
-                  status: 'video_generated',
-                  videoUrls: videoUrls,
-                })
-              }}
-            />
-          </TabsContent>
-        </Tabs>
-      </div>
-    </main>
+      </main>
+    </div>
   )
 }
 
 export default function CreatePodcastPage() {
   return (
     <Suspense fallback={
-      <main className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="h-12 w-12 animate-spin text-[#D42E1B] mx-auto mb-4" />
+          <Loader2 className="h-12 w-12 animate-spin text-purple-500 mx-auto mb-4" />
           <p className="text-gray-600">Chargement...</p>
         </div>
-      </main>
+      </div>
     }>
       <CreatePodcastPageContent />
     </Suspense>

@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -10,8 +9,8 @@ import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import SudOuestLogo from '@/components/ui/SudOuestLogo'
-import { Plus, Film, Loader2, Play, Pause, Trash2, Edit2, User, Home, Wand2, Upload, Sparkles, ImageIcon, Mic, Square, Volume2, Camera, Video, Grid3X3, Maximize2, Check, Eye, Shuffle, Images } from 'lucide-react'
+import Sidebar from '@/components/layout/Sidebar'
+import { Plus, Film, Loader2, Play, Pause, Trash2, Edit2, User, Wand2, Upload, Sparkles, Mic, Square, Volume2, Camera, Video, Grid3X3, Maximize2, Check, Eye, Shuffle, Images } from 'lucide-react'
 
 interface ImageVariation {
   url: string
@@ -77,90 +76,75 @@ export default function AvatarsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
-      {/* Header avec logo Sud-Ouest */}
-      <div className="bg-[#D42E1B] text-white">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <SudOuestLogo width={120} height={40} fill="white" />
-              <div className="hidden md:block h-8 w-px bg-white/30" />
-              <h1 className="text-2xl md:text-3xl font-bold">Avatars</h1>
-            </div>
-            <div className="flex items-center gap-3">
-              <Link href="/">
-                <Button variant="outline" className="bg-white/10 text-white hover:bg-white/20 border-white/30">
-                  <Home className="h-4 w-4 mr-2" />
-                  Accueil
-                </Button>
-              </Link>
-              <Link href="/gallery">
-                <Button variant="outline" className="bg-white text-[#D42E1B] hover:bg-gray-100 border-0">
-                  <Film className="h-4 w-4 mr-2" />
-                  Galerie
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div className="min-h-screen bg-gray-50">
+      <Sidebar />
 
-      <div className="container mx-auto px-4 py-12">
-        {/* Title and Add Button */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h2 className="text-3xl font-bold text-gray-900">Gérer les avatars</h2>
-            <p className="text-gray-600 mt-2">
-              Créez et gérez les personnages pour vos podcasts
-            </p>
-          </div>
-          <Button 
-            onClick={() => setShowCreateModal(true)}
-            className="bg-[#D42E1B] hover:bg-[#B01030] text-white"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Nouvel Avatar
-          </Button>
-        </div>
-
-        {/* Content */}
-        {loading ? (
-          <div className="flex justify-center items-center py-20">
-            <Loader2 className="h-12 w-12 animate-spin text-[#D42E1B]" />
-          </div>
-        ) : error ? (
-          <div className="text-center py-20">
-            <p className="text-red-600">{error}</p>
-            <Button onClick={loadAvatars} className="mt-4">
-              Réessayer
-            </Button>
-          </div>
-        ) : avatars.length === 0 ? (
-          <div className="text-center py-20">
-            <User className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">Aucun avatar</h3>
-            <p className="text-gray-600 mb-6">Créez votre premier avatar pour commencer</p>
+      <main className="lg:ml-72 min-h-screen">
+        <div className="p-6 lg:p-8">
+          {/* Page Header */}
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">Avatars</h1>
+              <p className="text-gray-500">
+                Créez et gérez les personnages pour vos podcasts
+              </p>
+            </div>
             <Button 
               onClick={() => setShowCreateModal(true)}
-              className="bg-[#D42E1B] hover:bg-[#B01030]"
+              className="bg-gray-900 hover:bg-gray-800 text-white"
             >
               <Plus className="h-4 w-4 mr-2" />
-              Créer un avatar
+              Nouvel Avatar
             </Button>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {avatars.map((avatar) => (
-              <AvatarCard
-                key={avatar.id}
-                avatar={avatar}
-                onEdit={() => setEditingAvatar(avatar)}
-                onDelete={() => handleDelete(avatar)}
-              />
-            ))}
-          </div>
-        )}
-      </div>
+
+          {/* Content */}
+          {loading ? (
+            <div className="flex justify-center items-center py-20">
+              <Loader2 className="h-12 w-12 animate-spin text-purple-500" />
+            </div>
+          ) : error ? (
+            <div className="text-center py-20">
+              <p className="text-red-600">{error}</p>
+              <Button onClick={loadAvatars} className="mt-4">
+                Réessayer
+              </Button>
+            </div>
+          ) : avatars.length === 0 ? (
+            <div className="text-center py-20 bg-white rounded-xl border border-gray-200">
+              <User className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Aucun avatar</h3>
+              <p className="text-gray-600 mb-6">Créez votre premier avatar pour commencer</p>
+              <Button 
+                onClick={() => setShowCreateModal(true)}
+                className="bg-gray-900 hover:bg-gray-800 text-white"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Créer un avatar
+              </Button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {avatars.map((avatar) => (
+                <AvatarCard
+                  key={avatar.id}
+                  avatar={avatar}
+                  onEdit={() => setEditingAvatar(avatar)}
+                  onDelete={() => handleDelete(avatar)}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Footer */}
+          <footer className="mt-12 pt-6 border-t border-gray-200">
+            <div className="flex items-center justify-between text-sm text-gray-400">
+              <span>Podcaster © 2025</span>
+              <span>POC Propulsé par l'IA</span>
+            </div>
+          </footer>
+        </div>
+      </main>
 
       {/* Create/Edit Modal */}
       <AvatarModal
@@ -176,7 +160,7 @@ export default function AvatarsPage() {
           setEditingAvatar(null)
         }}
       />
-    </main>
+    </div>
   )
 }
 
@@ -206,7 +190,7 @@ function AvatarCard({
   }
 
   return (
-    <Card className="overflow-hidden hover:shadow-lg transition-shadow">
+    <Card className="overflow-hidden hover:shadow-lg transition-shadow border border-gray-200 hover:border-purple-300">
       {/* Avatar Image */}
       <div className="relative aspect-square bg-gray-100">
         <img
@@ -219,7 +203,7 @@ function AvatarCard({
         />
         <div className="absolute top-3 left-3 flex gap-2">
           {avatar.isDefault && (
-            <div className="px-2 py-1 bg-[#D42E1B] text-white text-xs font-medium rounded">
+            <div className="px-2 py-1 bg-purple-500 text-white text-xs font-medium rounded">
               Par défaut
             </div>
           )}
@@ -241,7 +225,7 @@ function AvatarCard({
             variant="outline"
             size="sm"
             onClick={togglePlay}
-            className="w-full"
+            className="w-full border-gray-200"
           >
             {isPlaying ? (
               <>
@@ -268,7 +252,7 @@ function AvatarCard({
             variant="outline"
             size="sm"
             onClick={onEdit}
-            className="flex-1"
+            className="flex-1 border-gray-200"
           >
             <Edit2 className="h-4 w-4 mr-2" />
             Modifier
@@ -808,6 +792,7 @@ De Bordeaux à Biarritz, en passant par Pau et Arcachon, nous allons explorer en
               onChange={(e) => setName(e.target.value)}
               placeholder="Ex: Marie Dupont"
               disabled={saving}
+              className="border-gray-200"
             />
           </div>
 
@@ -834,11 +819,11 @@ De Bordeaux à Biarritz, en passant par Pau et Arcachon, nous allons explorer en
                     value={voiceUrl}
                     onChange={(e) => setVoiceUrl(e.target.value)}
                     placeholder="URL du fichier MP3 ou uploadez..."
-                    className="flex-1"
+                    className="flex-1 border-gray-200"
                     disabled={saving}
                   />
                   <label className="cursor-pointer">
-                    <Button type="button" variant="outline" disabled={uploading || saving} asChild>
+                    <Button type="button" variant="outline" disabled={uploading || saving} asChild className="border-gray-200">
                       <span>{uploading ? '...' : 'Upload'}</span>
                     </Button>
                     <input
@@ -862,19 +847,19 @@ De Bordeaux à Biarritz, en passant par Pau et Arcachon, nous allons explorer en
 
               {/* Record Tab */}
               <TabsContent value="record" className="space-y-4 mt-4">
-                <div className="p-4 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg border border-blue-200">
+                <div className="p-4 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg border border-purple-200">
                   <div className="flex items-center gap-2 mb-3">
-                    <Mic className="h-5 w-5 text-blue-600" />
-                    <h4 className="font-semibold text-blue-900">Enregistrement vocal</h4>
+                    <Mic className="h-5 w-5 text-purple-600" />
+                    <h4 className="font-semibold text-purple-900">Enregistrement vocal</h4>
                   </div>
                   
                   {/* Sample text to read */}
                   <div className="mb-4">
-                    <Label className="text-blue-900 mb-2 block">Texte à lire :</Label>
-                    <div className="p-3 bg-white rounded-lg border border-blue-200 text-sm text-gray-700 leading-relaxed">
+                    <Label className="text-purple-900 mb-2 block">Texte à lire :</Label>
+                    <div className="p-3 bg-white rounded-lg border border-purple-200 text-sm text-gray-700 leading-relaxed">
                       {sampleText}
                     </div>
-                    <p className="text-xs text-blue-600 mt-2">
+                    <p className="text-xs text-purple-600 mt-2">
                       💡 Lisez ce texte naturellement pour créer un échantillon de voix de qualité
                     </p>
                   </div>
@@ -893,7 +878,7 @@ De Bordeaux à Biarritz, en passant par Pau et Arcachon, nous allons explorer en
                         type="button"
                         onClick={startRecording}
                         disabled={uploading}
-                        className="bg-blue-600 hover:bg-blue-700"
+                        className="bg-purple-600 hover:bg-purple-700"
                       >
                         <Mic className="mr-2 h-4 w-4" />
                         Commencer l'enregistrement
@@ -921,8 +906,8 @@ De Bordeaux à Biarritz, en passant par Pau et Arcachon, nous allons explorer en
                   {/* Recorded audio preview */}
                   {recordedUrl && !isRecording && (
                     <div className="mt-4 space-y-3">
-                      <div className="flex items-center gap-3 p-3 bg-white rounded-lg border border-blue-200">
-                        <Play className="h-5 w-5 text-blue-600" />
+                      <div className="flex items-center gap-3 p-3 bg-white rounded-lg border border-purple-200">
+                        <Play className="h-5 w-5 text-purple-600" />
                         <audio src={recordedUrl} controls className="flex-1 h-10" />
                       </div>
                       <div className="flex gap-2">
@@ -954,6 +939,7 @@ De Bordeaux à Biarritz, en passant par Pau et Arcachon, nous allons explorer en
                             setRecordingTime(0)
                           }}
                           disabled={uploading}
+                          className="border-gray-200"
                         >
                           Recommencer
                         </Button>
@@ -999,11 +985,11 @@ De Bordeaux à Biarritz, en passant par Pau et Arcachon, nous allons explorer en
                       setImageVariations([]) // Clear variations when URL changes
                     }}
                     placeholder="URL de l'image ou uploadez..."
-                    className="flex-1"
+                    className="flex-1 border-gray-200"
                     disabled={saving}
                   />
                   <label className="cursor-pointer">
-                    <Button type="button" variant="outline" disabled={uploading || saving} asChild>
+                    <Button type="button" variant="outline" disabled={uploading || saving} asChild className="border-gray-200">
                       <span>{uploading ? '...' : 'Upload'}</span>
                     </Button>
                     <input
@@ -1019,7 +1005,7 @@ De Bordeaux à Biarritz, en passant par Pau et Arcachon, nous allons explorer en
                 </div>
                 {imageUrl && (
                   <div className="flex items-center gap-4">
-                    <div className="w-24 h-24 rounded-lg overflow-hidden border-2 border-[#D42E1B]">
+                    <div className="w-24 h-24 rounded-lg overflow-hidden border-2 border-purple-500">
                       <img 
                         src={imageUrl} 
                         alt="Aperçu" 
@@ -1155,7 +1141,7 @@ De Bordeaux à Biarritz, en passant par Pau et Arcachon, nous allons explorer en
                       value={aiPrompt}
                       onChange={(e) => setAiPrompt(e.target.value)}
                       placeholder="Ex: portrait professionnel d'un présentateur TV en costume, fond neutre, éclairage studio..."
-                      className="min-h-[80px]"
+                      className="min-h-[80px] border-purple-200"
                     />
                   </div>
 
@@ -1164,7 +1150,7 @@ De Bordeaux à Biarritz, en passant par Pau et Arcachon, nous allons explorer en
                     <div className="space-y-2">
                       <Label className="text-purple-900">Format</Label>
                       <Select value={aiAspectRatio} onValueChange={setAiAspectRatio}>
-                        <SelectTrigger>
+                        <SelectTrigger className="border-purple-200">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -1180,7 +1166,7 @@ De Bordeaux à Biarritz, en passant par Pau et Arcachon, nous allons explorer en
                     <div className="space-y-2">
                       <Label className="text-purple-900">Résolution</Label>
                       <Select value={aiResolution} onValueChange={(v) => setAiResolution(v as '1K' | '2K' | '4K')}>
-                        <SelectTrigger>
+                        <SelectTrigger className="border-purple-200">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -1251,13 +1237,13 @@ De Bordeaux à Biarritz, en passant par Pau et Arcachon, nous allons explorer en
                               type="button"
                               onClick={() => selectAiImage(img.url)}
                               className={`relative w-full aspect-square rounded-lg overflow-hidden border-2 transition-all hover:scale-[1.02] ${
-                                imageUrl === img.url ? 'border-[#D42E1B] ring-2 ring-[#D42E1B]' : 'border-gray-200 hover:border-purple-400'
+                                imageUrl === img.url ? 'border-purple-500 ring-2 ring-purple-500' : 'border-gray-200 hover:border-purple-400'
                               }`}
                             >
                               <img src={img.url} alt={`Généré ${idx + 1}`} className="w-full h-full object-cover" />
                               {imageUrl === img.url && (
                                 <div className="absolute top-2 right-2">
-                                  <div className="bg-[#D42E1B] text-white p-1 rounded-full">
+                                  <div className="bg-purple-500 text-white p-1 rounded-full">
                                     <Check className="h-4 w-4" />
                                   </div>
                                 </div>
@@ -1269,7 +1255,7 @@ De Bordeaux à Biarritz, en passant par Pau et Arcachon, nous allons explorer en
                                 size="sm"
                                 variant={imageUrl === img.url ? "default" : "outline"}
                                 onClick={() => selectAiImage(img.url)}
-                                className={`flex-1 text-xs ${imageUrl === img.url ? 'bg-[#D42E1B] hover:bg-[#B01030]' : ''}`}
+                                className={`flex-1 text-xs ${imageUrl === img.url ? 'bg-purple-500 hover:bg-purple-600' : 'border-gray-200'}`}
                               >
                                 {imageUrl === img.url ? '✓ Sélectionné' : 'Sélectionner'}
                               </Button>
@@ -1336,7 +1322,7 @@ De Bordeaux à Biarritz, en passant par Pau et Arcachon, nous allons explorer en
                             onClick={() => selectAiImage(aiGeneratedImages[previewImageIndex]?.url)}
                             className={`px-8 ${
                               imageUrl === aiGeneratedImages[previewImageIndex]?.url 
-                                ? 'bg-[#D42E1B] hover:bg-[#B01030]' 
+                                ? 'bg-purple-500 hover:bg-purple-600' 
                                 : 'bg-purple-600 hover:bg-purple-700'
                             }`}
                           >
@@ -1478,20 +1464,20 @@ De Bordeaux à Biarritz, en passant par Pau et Arcachon, nous allons explorer en
           )}
 
           {/* Actions */}
-          <div className="flex gap-3 pt-4 border-t">
+          <div className="flex gap-3 pt-4 border-t border-gray-200">
             <Button
               type="button"
               variant="outline"
               onClick={onClose}
               disabled={saving}
-              className="flex-1"
+              className="flex-1 border-gray-200"
             >
               Annuler
             </Button>
             <Button
               type="submit"
               disabled={saving || uploading || !name.trim() || !voiceUrl || !imageUrl}
-              className="flex-1 bg-[#D42E1B] hover:bg-[#B01030]"
+              className="flex-1 bg-gray-900 hover:bg-gray-800 text-white"
             >
               {saving ? (
                 <>

@@ -1,17 +1,17 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { db, podcasts } from '@/lib/db'
-import { desc, eq, or, isNull } from 'drizzle-orm'
+import { desc, eq, or, isNull, and } from 'drizzle-orm'
 
 export const dynamic = 'force-dynamic'
 
 /**
  * GET /api/podcasts/latest
- * Récupère les derniers podcasts de l'utilisateur connecté
+ * Récupère les derniers podcasts de l'organisation ou de l'utilisateur
  */
 export async function GET() {
   try {
-    const { userId } = await auth()
+    const { userId, orgId } = await auth()
     
     if (!userId) {
       return NextResponse.json(
@@ -20,15 +20,27 @@ export async function GET() {
       )
     }
 
-    // Get podcasts belonging to this user OR legacy podcasts without userId
-    const latestPodcasts = await db
-      .select()
-      .from(podcasts)
-      .where(or(eq(podcasts.userId, userId), isNull(podcasts.userId)))
-      .orderBy(desc(podcasts.createdAt))
-      .limit(50)
+    let latestPodcasts
 
-    return NextResponse.json({ podcasts: latestPodcasts })
+    if (orgId) {
+      // If org selected: show org's podcasts OR legacy podcasts without orgId (for migration)
+      latestPodcasts = await db
+        .select()
+        .from(podcasts)
+        .where(or(eq(podcasts.orgId, orgId), isNull(podcasts.orgId)))
+        .orderBy(desc(podcasts.createdAt))
+        .limit(50)
+    } else {
+      // No org selected: show user's personal podcasts
+      latestPodcasts = await db
+        .select()
+        .from(podcasts)
+        .where(and(eq(podcasts.userId, userId), isNull(podcasts.orgId)))
+        .orderBy(desc(podcasts.createdAt))
+        .limit(50)
+    }
+
+    return NextResponse.json({ podcasts: latestPodcasts, orgId })
   } catch (error) {
     console.error('Error fetching podcasts:', error)
     return NextResponse.json(

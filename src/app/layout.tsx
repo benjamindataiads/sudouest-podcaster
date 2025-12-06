@@ -4,12 +4,13 @@ import './globals.css'
 import { Providers } from './providers'
 import { ClerkProvider } from '@clerk/nextjs'
 import { frFR } from '@clerk/localizations'
+import { BrandingProvider } from '@/contexts/BrandingContext'
 
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Sud-Ouest Podcaster',
-  description: 'Générateur automatique de podcasts audio et vidéo basé sur les articles du journal Sud-Ouest',
+  title: 'Podcaster',
+  description: 'Générateur automatique de podcasts audio et vidéo propulsé par l\'IA',
 }
 
 // Force dynamic rendering to avoid build-time Clerk key requirement
@@ -27,7 +28,9 @@ export default function RootLayout({
     <html lang="fr">
       <body className={inter.className}>
         <Providers>
-          {children}
+          <BrandingProvider>
+            {children}
+          </BrandingProvider>
         </Providers>
       </body>
     </html>

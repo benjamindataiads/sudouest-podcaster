@@ -10,7 +10,7 @@ import { eq, and } from 'drizzle-orm'
  */
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await auth()
+    const { userId, orgId } = await auth()
     
     if (!userId) {
       return NextResponse.json(
@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    console.log('Save podcast request:', { id: body.id, title: body.title, status: body.status, userId })
+    console.log('Save podcast request:', { id: body.id, title: body.title, status: body.status, userId, orgId })
     
     const {
       id,
@@ -50,18 +50,29 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Podcast non trouvé' }, { status: 404 })
       }
       
-      // Check ownership (allow update if userId matches OR if legacy podcast without userId)
-      if (existing.userId && existing.userId !== userId) {
-        return NextResponse.json({ error: 'Non autorisé' }, { status: 403 })
+      // Check ownership based on org or user
+      if (orgId) {
+        // Org mode: check org ownership
+        if (existing.orgId && existing.orgId !== orgId) {
+          return NextResponse.json({ error: 'Non autorisé' }, { status: 403 })
+        }
+      } else {
+        // Personal mode: check user ownership
+        if (existing.userId && existing.userId !== userId) {
+          return NextResponse.json({ error: 'Non autorisé' }, { status: 403 })
+        }
       }
 
       const updateData: Partial<NewPodcast> = {
         updatedAt: new Date(),
       }
       
-      // Claim legacy podcasts for current user
+      // Claim legacy podcasts for current user/org
       if (!existing.userId) {
         updateData.userId = userId
+      }
+      if (orgId && !existing.orgId) {
+        updateData.orgId = orgId
       }
       
       if (title !== undefined) updateData.title = title
@@ -90,9 +101,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ podcast: updated })
     }
 
-    // Sinon, créer un nouveau podcast avec userId
+    // Sinon, créer un nouveau podcast avec userId et orgId
     const insertData: NewPodcast = {
       userId, // Associate with current user
+      orgId: orgId || undefined, // Associate with organization if selected
       title: title || `Podcast ${new Date().toLocaleDateString('fr-FR')}`,
       status: status || 'draft',
       currentStep: currentStep || 1,
@@ -111,7 +123,7 @@ export async function POST(request: NextRequest) {
       .values(insertData)
       .returning()
 
-    console.log('✅ Podcast created:', newPodcast.id, 'for user:', userId)
+    console.log('✅ Podcast created:', newPodcast.id, 'for user:', userId, 'org:', orgId)
     return NextResponse.json({ podcast: newPodcast })
   } catch (error) {
     console.error('❌ Error saving podcast:', error)

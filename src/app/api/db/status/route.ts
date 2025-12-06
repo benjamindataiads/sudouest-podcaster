@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic'
 export async function GET() {
   try {
     // Test connection
-    const [testResult] = await db.execute(sql`SELECT 1 as test`)
+    await db.execute(sql`SELECT 1 as test`)
     
     // Check if tables exist
     const tables = await db.execute(sql`
@@ -54,33 +54,38 @@ export async function GET() {
     `)
 
     // Count records
-    const [podcastCount] = await db.execute(sql`SELECT COUNT(*) as count FROM podcasts`)
-    const [avatarCount] = await db.execute(sql`SELECT COUNT(*) as count FROM avatars`)
-    const [orgSettingsCount] = await db.execute(sql`SELECT COUNT(*) as count FROM organization_settings`)
-    const [rssFeedsCount] = await db.execute(sql`SELECT COUNT(*) as count FROM rss_feeds`)
+    const podcastCount = await db.execute(sql`SELECT COUNT(*)::int as count FROM podcasts`)
+    const avatarCount = await db.execute(sql`SELECT COUNT(*)::int as count FROM avatars`)
+    const orgSettingsCount = await db.execute(sql`SELECT COUNT(*)::int as count FROM organization_settings`)
+    const rssFeedsCount = await db.execute(sql`SELECT COUNT(*)::int as count FROM rss_feeds`)
+
+    // Convert results to arrays (drizzle returns array-like objects)
+    const tablesArr = Array.from(tables) as Array<{ table_name: string }>
+    const orgSettingsColsArr = Array.from(orgSettingsCols) as Array<{ column_name: string; data_type: string }>
+    const rssFeedsColsArr = Array.from(rssFeedsCols) as Array<{ column_name: string; data_type: string }>
+    const podcastsColsArr = Array.from(podcastsCols) as Array<{ column_name: string; data_type: string }>
+    const avatarsColsArr = Array.from(avatarsCols) as Array<{ column_name: string; data_type: string }>
 
     return NextResponse.json({
       status: 'connected',
-      tables: tables.rows?.map((r: { table_name: string }) => r.table_name) || [],
+      tables: tablesArr.map(r => r.table_name),
       migrations: {
         organization_settings: {
-          exists: orgSettingsCols.rows && orgSettingsCols.rows.length > 0,
-          columns: orgSettingsCols.rows || [],
-          count: (podcastCount as { count: number })?.count || 0,
+          exists: orgSettingsColsArr.length > 0,
+          columns: orgSettingsColsArr,
         },
         rss_feeds: {
-          exists: rssFeedsCols.rows && rssFeedsCols.rows.length > 0,
-          columns: rssFeedsCols.rows || [],
-          count: (rssFeedsCount as { count: number })?.count || 0,
+          exists: rssFeedsColsArr.length > 0,
+          columns: rssFeedsColsArr,
         },
-        podcasts_org_columns: podcastsCols.rows || [],
-        avatars_org_columns: avatarsCols.rows || [],
+        podcasts_org_columns: podcastsColsArr,
+        avatars_org_columns: avatarsColsArr,
       },
       counts: {
-        podcasts: (podcastCount as { count: number })?.count || 0,
-        avatars: (avatarCount as { count: number })?.count || 0,
-        organizationSettings: (orgSettingsCount as { count: number })?.count || 0,
-        rssFeeds: (rssFeedsCount as { count: number })?.count || 0,
+        podcasts: (Array.from(podcastCount)[0] as { count: number })?.count || 0,
+        avatars: (Array.from(avatarCount)[0] as { count: number })?.count || 0,
+        organizationSettings: (Array.from(orgSettingsCount)[0] as { count: number })?.count || 0,
+        rssFeeds: (Array.from(rssFeedsCount)[0] as { count: number })?.count || 0,
       },
     })
   } catch (error) {

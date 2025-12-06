@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { auth } from '@clerk/nextjs/server'
 import { db, avatars } from '@/lib/db'
-import { eq } from 'drizzle-orm'
+import { eq, or, isNull } from 'drizzle-orm'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,15 +11,31 @@ const DEFAULT_AVATAR = {
   voiceUrl: 'https://dataiads-test1.fr/sudouest/voix.mp3',
   imageUrl: 'https://dataiads-test1.fr/sudouest/avatarsudsouest.png',
   isDefault: true,
+  userId: null as string | null, // Default avatars have no user
 }
 
 /**
  * GET /api/avatars
- * Get all avatars, create default if none exist
+ * Get avatars: default avatars + user's custom avatars
  */
 export async function GET() {
   try {
-    let allAvatars = await db.select().from(avatars).orderBy(avatars.createdAt)
+    const { userId } = await auth()
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
+    }
+
+    // Get default avatars (isDefault=true) and user's custom avatars
+    let allAvatars = await db
+      .select()
+      .from(avatars)
+      .where(or(
+        eq(avatars.isDefault, true),
+        eq(avatars.userId, userId),
+        isNull(avatars.userId) // Legacy avatars without userId
+      ))
+      .orderBy(avatars.createdAt)
     
     // If no avatars exist, create the default one
     if (allAvatars.length === 0) {
@@ -43,10 +60,16 @@ export async function GET() {
 
 /**
  * POST /api/avatars
- * Create a new avatar
+ * Create a new avatar for the current user
  */
 export async function POST(request: NextRequest) {
   try {
+    const { userId } = await auth()
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
+    }
+
     const body = await request.json()
     const { name, voiceUrl, imageUrl, imageVariations } = body
     
@@ -60,6 +83,7 @@ export async function POST(request: NextRequest) {
     const [newAvatar] = await db
       .insert(avatars)
       .values({
+        userId, // Associate with current user
         name,
         voiceUrl,
         imageUrl,
@@ -68,7 +92,7 @@ export async function POST(request: NextRequest) {
       })
       .returning()
     
-    console.log(`✅ Created avatar: ${name} with ${imageVariations?.length || 0} variations`)
+    console.log(`✅ Created avatar: ${name} for user: ${userId} with ${imageVariations?.length || 0} variations`)
     
     return NextResponse.json({ avatar: newAvatar })
   } catch (error) {

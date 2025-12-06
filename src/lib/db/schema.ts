@@ -30,6 +30,7 @@ export interface AudioChunk {
  */
 export const podcasts = pgTable('podcasts', {
   id: serial('id').primaryKey(),
+  userId: varchar('user_id', { length: 255 }), // Clerk user ID for ownership
   title: text('title').notNull(),
   date: timestamp('date').defaultNow().notNull(),
   status: varchar('status', { length: 50 }).notNull().default('draft'), // draft, articles_selected, script_ready, audio_generated, video_generating, video_generated, completed
@@ -178,6 +179,7 @@ export interface AvatarImageVariant {
  */
 export const avatars = pgTable('avatars', {
   id: serial('id').primaryKey(),
+  userId: varchar('user_id', { length: 255 }), // Clerk user ID for ownership (null for default avatars)
   name: varchar('name', { length: 100 }).notNull(),
   voiceUrl: text('voice_url').notNull(), // URL du fichier MP3 de référence pour le clonage vocal
   imageUrl: text('image_url').notNull(), // URL de l'image principale de l'avatar

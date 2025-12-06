@@ -34,7 +34,7 @@ export default function SignUpPage() {
 
       {/* Footer */}
       <div className="mt-8 text-white/60 text-sm">
-        © 2024 Sud-Ouest Podcaster
+        © 2025 Sud-Ouest Podcaster
       </div>
     </div>
   )

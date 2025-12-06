@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 export const dynamic = 'force-dynamic'
+import { auth } from '@clerk/nextjs/server'
 import { db, podcasts, audioFiles, videoFiles, avatars } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 
@@ -12,6 +13,12 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    const { userId } = await auth()
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
+    }
+
     const podcastId = parseInt(params.id)
 
     if (isNaN(podcastId)) {
@@ -32,6 +39,11 @@ export async function GET(
         { error: 'Podcast non trouvé' },
         { status: 404 }
       )
+    }
+
+    // Check ownership (allow access if userId matches OR if legacy podcast without userId)
+    if (podcast.userId && podcast.userId !== userId) {
+      return NextResponse.json({ error: 'Non autorisé' }, { status: 403 })
     }
 
     // Load avatar if avatarId exists
@@ -77,8 +89,14 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
+    const { userId } = await auth()
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
+    }
+
     const podcastId = parseInt(params.id)
-    console.log('Delete podcast request:', podcastId)
+    console.log('Delete podcast request:', podcastId, 'by user:', userId)
 
     if (isNaN(podcastId)) {
       return NextResponse.json(
@@ -99,6 +117,11 @@ export async function DELETE(
         { error: 'Podcast non trouvé' },
         { status: 404 }
       )
+    }
+
+    // Check ownership (allow delete if userId matches OR if legacy podcast without userId)
+    if (existingPodcast.userId && existingPodcast.userId !== userId) {
+      return NextResponse.json({ error: 'Non autorisé' }, { status: 403 })
     }
 
     // Supprimer les jobs vidéo associés (ajouté pour éviter contrainte FK)

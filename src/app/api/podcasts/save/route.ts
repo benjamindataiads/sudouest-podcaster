@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 export const dynamic = 'force-dynamic'
+import { auth } from '@clerk/nextjs/server'
 import { db, podcasts, type NewPodcast } from '@/lib/db'
-import { eq } from 'drizzle-orm'
+import { eq, and } from 'drizzle-orm'
 
 /**
  * POST /api/podcasts/save
@@ -9,8 +10,17 @@ import { eq } from 'drizzle-orm'
  */
 export async function POST(request: NextRequest) {
   try {
+    const { userId } = await auth()
+    
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'Non authentifié' },
+        { status: 401 }
+      )
+    }
+
     const body = await request.json()
-    console.log('Save podcast request:', { id: body.id, title: body.title, status: body.status })
+    console.log('Save podcast request:', { id: body.id, title: body.title, status: body.status, userId })
     
     const {
       id,
@@ -29,8 +39,29 @@ export async function POST(request: NextRequest) {
 
     // Si ID existe, mettre à jour
     if (id) {
+      // First verify ownership
+      const [existing] = await db
+        .select()
+        .from(podcasts)
+        .where(eq(podcasts.id, id))
+        .limit(1)
+      
+      if (!existing) {
+        return NextResponse.json({ error: 'Podcast non trouvé' }, { status: 404 })
+      }
+      
+      // Check ownership (allow update if userId matches OR if legacy podcast without userId)
+      if (existing.userId && existing.userId !== userId) {
+        return NextResponse.json({ error: 'Non autorisé' }, { status: 403 })
+      }
+
       const updateData: Partial<NewPodcast> = {
         updatedAt: new Date(),
+      }
+      
+      // Claim legacy podcasts for current user
+      if (!existing.userId) {
+        updateData.userId = userId
       }
       
       if (title !== undefined) updateData.title = title
@@ -59,8 +90,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ podcast: updated })
     }
 
-    // Sinon, créer un nouveau podcast
+    // Sinon, créer un nouveau podcast avec userId
     const insertData: NewPodcast = {
+      userId, // Associate with current user
       title: title || `Podcast ${new Date().toLocaleDateString('fr-FR')}`,
       status: status || 'draft',
       currentStep: currentStep || 1,
@@ -79,7 +111,7 @@ export async function POST(request: NextRequest) {
       .values(insertData)
       .returning()
 
-    console.log('✅ Podcast created:', newPodcast.id)
+    console.log('✅ Podcast created:', newPodcast.id, 'for user:', userId)
     return NextResponse.json({ podcast: newPodcast })
   } catch (error) {
     console.error('❌ Error saving podcast:', error)

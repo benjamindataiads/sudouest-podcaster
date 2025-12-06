@@ -549,7 +549,7 @@ export default function StepFour({
             <div className="flex-1">
               <h3 className="font-semibold mb-2">{avatarName}</h3>
               <p className="text-sm text-gray-600 mb-3">
-                Cet avatar sera utilisé pour générer les vidéos avec lip-sync via Kling AI Avatar.
+                Cet avatar sera utilisé pour générer les vidéos avec lip-sync via VEED Fabric 1.0.
               </p>
               {allAvatarImages.length > 1 && (
                 <div className="p-2 bg-orange-50 border border-orange-200 rounded-lg mb-2">
@@ -560,7 +560,7 @@ export default function StepFour({
                 </div>
               )}
               <div className="text-xs text-gray-500 space-y-1">
-                <p>• Modèle: Kling AI Avatar (HD)</p>
+                <p>• Modèle: VEED Fabric 1.0</p>
                 <p>• Durée max par segment: ~15 secondes</p>
               </div>
             </div>

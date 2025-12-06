@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 export const dynamic = 'force-dynamic'
 
 /**
- * GET /api/debug/env
+ * GET /api/debug/env 
  * Check if Clerk env vars are set (at build time vs runtime)
  */
 export async function GET() {

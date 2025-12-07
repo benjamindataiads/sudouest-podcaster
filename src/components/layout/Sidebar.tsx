@@ -39,8 +39,8 @@ const avatarShortsItems: NavItem[] = [
   { label: 'Galerie', href: '/gallery', icon: <Film className="h-5 w-5" /> },
 ]
 
-const videoArticleItems: NavItem[] = [
-  { label: 'Vidéos Article', href: '/video-article', icon: <Newspaper className="h-5 w-5" /> },
+const audioArticleItems: NavItem[] = [
+  { label: 'Audio Articles', href: '/audio-article', icon: <Newspaper className="h-5 w-5" /> },
 ]
 
 const avatarItems: NavItem[] = [
@@ -144,7 +144,7 @@ export default function Sidebar() {
       {/* Navigation */}
       <div className="flex-1 overflow-y-auto px-3 py-4">
         <NavSection title="Avatar Shorts" items={avatarShortsItems} />
-        <NavSection title="Video Article" items={videoArticleItems} />
+        <NavSection title="Audio Article" items={audioArticleItems} />
         <NavSection title="Personnages" items={avatarItems} />
       </div>
 

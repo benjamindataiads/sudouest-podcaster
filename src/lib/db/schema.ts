@@ -251,3 +251,24 @@ export type NewOrganizationSetting = typeof organizationSettings.$inferInsert
 export type RssFeed = typeof rssFeeds.$inferSelect
 export type NewRssFeed = typeof rssFeeds.$inferInsert
 
+/**
+ * Table pour stocker les Audio Articles (résumés audio d'articles)
+ */
+export const audioArticles = pgTable('audio_articles', {
+  id: serial('id').primaryKey(),
+  userId: varchar('user_id', { length: 255 }), // Clerk user ID
+  orgId: varchar('org_id', { length: 255 }), // Clerk Organization ID
+  title: varchar('title', { length: 255 }).notNull(),
+  originalText: text('original_text').notNull(), // Texte original de l'article
+  summary: text('summary').notNull(), // Résumé généré
+  summaryDuration: varchar('summary_duration', { length: 10 }), // Durée cible du résumé (en secondes)
+  audioUrl: text('audio_url'), // URL du fichier audio généré
+  voice: varchar('voice', { length: 50 }).default('french'), // Langue de la voix
+  status: varchar('status', { length: 50 }).default('draft'), // draft, completed
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+})
+
+export type AudioArticle = typeof audioArticles.$inferSelect
+export type NewAudioArticle = typeof audioArticles.$inferInsert
+

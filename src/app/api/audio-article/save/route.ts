@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { title, originalText, summary, summaryDuration, audioUrl, voice } = body
+    const { title, originalText, summary, summaryDuration, audioUrl, voice, voiceId } = body
 
     if (!title || !originalText || !summary) {
       return NextResponse.json({ error: 'Données manquantes' }, { status: 400 })
@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
         summary,
         summaryDuration: summaryDuration || '60',
         audioUrl: audioUrl || undefined,
-        voice: voice || 'french',
+        voice: voiceId || voice || 'Wise_Woman',
         status: audioUrl ? 'completed' : 'draft',
       })
       .returning()

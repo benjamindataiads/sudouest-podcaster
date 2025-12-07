@@ -36,7 +36,7 @@ interface AudioArticle {
   summaryDuration: string
   summary: string
   audioUrl?: string
-  voice: string
+  voiceId: string
   title: string
   createdAt?: string
   status?: string
@@ -47,7 +47,7 @@ interface SavedAudioArticle {
   title: string
   summary: string
   audioUrl: string | null
-  voice: string
+  voice: string // DB column name is still 'voice'
   status: string
   createdAt: string
   summaryDuration: string
@@ -61,18 +61,25 @@ const DURATION_OPTIONS = [
   { value: '180', label: '~3 minutes' },
 ]
 
+// MiniMax Speech 2.5 Turbo Voice IDs
 const VOICE_OPTIONS = [
-  { value: 'french', label: 'Français' },
-  { value: 'english', label: 'Anglais' },
-  { value: 'german', label: 'Allemand' },
-  { value: 'spanish', label: 'Espagnol' },
-  { value: 'italian', label: 'Italien' },
-  { value: 'portuguese', label: 'Portugais' },
-  { value: 'dutch', label: 'Néerlandais' },
-  { value: 'arabic', label: 'Arabe' },
-  { value: 'chinese', label: 'Chinois' },
-  { value: 'japanese', label: 'Japonais' },
-  { value: 'korean', label: 'Coréen' },
+  { value: 'Wise_Woman', label: '👩‍🦳 Femme sage (défaut)' },
+  { value: 'Calm_Woman', label: '👩 Femme calme' },
+  { value: 'Sweet_Girl_2', label: '👧 Fille douce' },
+  { value: 'Lively_Girl', label: '💃 Fille vive' },
+  { value: 'Exuberant_Girl', label: '🌟 Fille exubérante' },
+  { value: 'Lovely_Girl', label: '💕 Fille adorable' },
+  { value: 'Inspirational_girl', label: '✨ Fille inspirante' },
+  { value: 'Deep_Voice_Man', label: '🎙️ Homme voix grave' },
+  { value: 'Patient_Man', label: '👨 Homme patient' },
+  { value: 'Determined_Man', label: '💪 Homme déterminé' },
+  { value: 'Elegant_Man', label: '🎩 Homme élégant' },
+  { value: 'Casual_Guy', label: '😎 Gars décontracté' },
+  { value: 'Decent_Boy', label: '👦 Garçon décent' },
+  { value: 'Young_Knight', label: '⚔️ Jeune chevalier' },
+  { value: 'Friendly_Person', label: '🤗 Personne amicale' },
+  { value: 'Imposing_Manner', label: '👔 Manière imposante' },
+  { value: 'Abbess', label: '🙏 Abbesse' },
 ]
 
 export default function AudioArticlePage() {
@@ -89,7 +96,7 @@ export default function AudioArticlePage() {
     originalText: '',
     summaryDuration: '60',
     summary: '',
-    voice: 'french',
+    voiceId: 'Wise_Woman',
     title: '',
   })
   
@@ -129,7 +136,7 @@ export default function AudioArticlePage() {
       originalText: '',
       summaryDuration: '60',
       summary: '',
-      voice: 'french',
+      voiceId: 'Wise_Woman',
       title: '',
     })
     setCurrentStep(1)
@@ -193,7 +200,7 @@ export default function AudioArticlePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           text: article.summary,
-          voice: article.voice,
+          voiceId: article.voiceId,
         }),
       })
 
@@ -634,10 +641,10 @@ export default function AudioArticlePage() {
 
                       <div className="grid md:grid-cols-2 gap-4">
                         <div>
-                          <Label>Langue de la voix</Label>
+                          <Label>Voix</Label>
                           <Select
-                            value={article.voice}
-                            onValueChange={(value) => setArticle(prev => ({ ...prev, voice: value }))}
+                            value={article.voiceId}
+                            onValueChange={(value) => setArticle(prev => ({ ...prev, voiceId: value }))}
                           >
                             <SelectTrigger className="mt-2">
                               <SelectValue />

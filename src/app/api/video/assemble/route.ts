@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300 // 5 minutes timeout for video assembly
+import { auth } from '@clerk/nextjs/server'
 import { concatenateVideos } from '@/lib/services/video-processor'
 import { uploadFinalPodcastToBucket, isBucketConfigured } from '@/lib/services/storage'
 import path from 'path'
@@ -12,10 +13,16 @@ import fs from 'fs/promises'
  */
 export async function POST(request: NextRequest) {
   try {
+    const { userId, orgId } = await auth()
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
+    }
+
     const body = await request.json()
     const { videoUrls, withCaptions = false, podcastId } = body
 
-    console.log('📦 Assemble request received:', { videoUrlsCount: videoUrls?.length, withCaptions, podcastId })
+    console.log('📦 Assemble request received:', { videoUrlsCount: videoUrls?.length, withCaptions, podcastId, userId, orgId })
 
     if (!videoUrls || !Array.isArray(videoUrls) || videoUrls.length === 0) {
       return NextResponse.json(
@@ -56,16 +63,34 @@ export async function POST(request: NextRequest) {
       const { db, podcasts } = await import('@/lib/db')
       const { eq } = await import('drizzle-orm')
       
-      await db.update(podcasts)
-        .set({
+      // First check if podcast exists
+      const [existing] = await db.select().from(podcasts).where(eq(podcasts.id, podcastId)).limit(1)
+      
+      if (!existing) {
+        console.warn(`⚠️ Podcast ${podcastId} not found, skipping update`)
+      } else {
+        // Update with orgId claim if needed
+        const updateData: Record<string, unknown> = {
           finalVideoUrl: finalVideoUrl,
           status: 'completed',
           completedAt: new Date(),
           updatedAt: new Date(),
-        })
-        .where(eq(podcasts.id, podcastId))
-      
-      console.log(`✅ Podcast ${podcastId} updated with final video: ${finalVideoUrl}`)
+        }
+        
+        // Claim for current org/user if not set
+        if (!existing.orgId && orgId) {
+          updateData.orgId = orgId
+        }
+        if (!existing.userId && userId) {
+          updateData.userId = userId
+        }
+        
+        await db.update(podcasts)
+          .set(updateData)
+          .where(eq(podcasts.id, podcastId))
+        
+        console.log(`✅ Podcast ${podcastId} updated with final video: ${finalVideoUrl}`)
+      }
     }
 
     return NextResponse.json({

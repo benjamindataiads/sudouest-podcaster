@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 export const dynamic = 'force-dynamic'
+import { auth } from '@clerk/nextjs/server'
 import { generateVideo, generateCaptions } from '@/lib/services/fal'
 import { addOverlaysToVideo } from '@/lib/services/video-processor'
 import { db, videoFiles, podcasts, audioFiles, avatars } from '@/lib/db'
@@ -12,6 +13,12 @@ import path from 'path'
  */
 export async function POST(request: NextRequest) {
   try {
+    const { userId, orgId } = await auth()
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
+    }
+
     const body = await request.json()
     const { 
       podcastId, 
@@ -21,6 +28,8 @@ export async function POST(request: NextRequest) {
       avatarImageUrl: providedImageUrl,  // URL d'image fournie directement
       withCaptions = true 
     } = body
+
+    console.log('🎬 Video generate request:', { podcastId, avatarId, userId, orgId })
 
     if (!audioUrl) {
       return NextResponse.json(

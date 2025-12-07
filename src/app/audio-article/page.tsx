@@ -27,7 +27,9 @@ import {
   Mic,
   Trash2,
   Link,
-  Globe
+  Globe,
+  Share2,
+  ExternalLink
 } from 'lucide-react'
 
 type Step = 1 | 2 | 3 | 4
@@ -110,6 +112,18 @@ export default function AudioArticlePage() {
   const [articleUrl, setArticleUrl] = useState('')
   const [playingId, setPlayingId] = useState<number | null>(null)
   const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null)
+  
+  // Clean up audio element when article.audioUrl changes (prevent cache issues)
+  useEffect(() => {
+    // When audioUrl changes, reset the audio element
+    if (audioElement) {
+      audioElement.pause()
+      audioElement.src = ''
+      setAudioElement(null)
+      setPlayingId(null)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [article.audioUrl])
 
   // Fetch saved articles
   const fetchArticles = useCallback(async () => {
@@ -172,6 +186,14 @@ export default function AudioArticlePage() {
 
   // Reset creation state when switching to create mode
   const startCreation = () => {
+    // Clean up any existing audio
+    if (audioElement) {
+      audioElement.pause()
+      audioElement.src = ''
+      setAudioElement(null)
+    }
+    setPlayingId(null)
+    
     setArticle({
       originalText: '',
       summaryDuration: '60',
@@ -290,24 +312,38 @@ export default function AudioArticlePage() {
   }
 
   // Audio playback for creation
+  // Toggle playback for creation step (Step 4 Synthesis)
   const togglePlayback = () => {
     if (!article.audioUrl) return
 
-    if (audioElement) {
-      if (playingId === -1) {
-        audioElement.pause()
-        setPlayingId(null)
-      } else {
-        audioElement.play()
-        setPlayingId(-1)
-      }
-    } else {
-      const audio = new Audio(article.audioUrl)
-      audio.onended = () => setPlayingId(null)
-      audio.play()
-      setAudioElement(audio)
-      setPlayingId(-1)
+    // If already playing this article's audio, pause it
+    if (audioElement && playingId === -1) {
+      audioElement.pause()
+      setPlayingId(null)
+      return
     }
+
+    // Clean up any existing audio first
+    if (audioElement) {
+      audioElement.pause()
+      audioElement.src = ''
+    }
+
+    // Create fresh audio element with cache-busting
+    const cacheBuster = `?t=${Date.now()}`
+    const audioUrl = article.audioUrl.includes('?') 
+      ? `${article.audioUrl}&cb=${Date.now()}`
+      : `${article.audioUrl}${cacheBuster}`
+    
+    const audio = new Audio(audioUrl)
+    audio.onended = () => setPlayingId(null)
+    audio.onerror = () => {
+      console.error('Audio playback error')
+      setPlayingId(null)
+    }
+    audio.play()
+    setAudioElement(audio)
+    setPlayingId(-1)
   }
 
   // Delete audio article
@@ -483,10 +519,20 @@ export default function AudioArticlePage() {
                               </p>
                             </div>
                             <a
+                              href={`/audio-article/${item.id}`}
+                              target="_blank"
+                              onClick={(e) => e.stopPropagation()}
+                              className="p-2 rounded-full hover:bg-white/20 transition-colors"
+                              title="Partager"
+                            >
+                              <Share2 className="h-5 w-5 text-white" />
+                            </a>
+                            <a
                               href={item.audioUrl}
                               download={`${item.title}.mp3`}
                               onClick={(e) => e.stopPropagation()}
                               className="p-2 rounded-full hover:bg-white/20 transition-colors"
+                              title="Télécharger"
                             >
                               <Download className="h-5 w-5 text-white" />
                             </a>
@@ -496,6 +542,7 @@ export default function AudioArticlePage() {
                                 handleDeleteArticle(item.id)
                               }}
                               className="p-2 rounded-full hover:bg-red-500/50 transition-colors"
+                              title="Supprimer"
                             >
                               <Trash2 className="h-5 w-5 text-white" />
                             </button>

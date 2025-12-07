@@ -41,20 +41,28 @@ export async function POST(request: NextRequest) {
 
     let finalVideoUrl: string
 
-    // Upload to bucket if configured, otherwise use local path
-    if (isBucketConfigured() && podcastId) {
+    // Always upload to R2 if configured (local paths don't work in Railway/production)
+    const bucketConfigured = isBucketConfigured()
+    console.log(`📦 Bucket configured: ${bucketConfigured}, podcastId: ${podcastId}`)
+    
+    if (bucketConfigured) {
       try {
-        console.log('📤 Uploading final video to bucket...')
-        finalVideoUrl = await uploadFinalPodcastToBucket(concatenatedPath, podcastId)
-        console.log(`✅ Uploaded to bucket: ${finalVideoUrl}`)
+        console.log('📤 Uploading final video to R2...')
+        // Use podcastId or generate a unique ID
+        const uploadId = podcastId || Date.now()
+        finalVideoUrl = await uploadFinalPodcastToBucket(concatenatedPath, uploadId)
+        console.log(`✅ Uploaded to R2: ${finalVideoUrl}`)
         
         // Clean up local file
         await fs.unlink(concatenatedPath).catch(() => {})
       } catch (uploadError) {
-        console.error('⚠️ Bucket upload failed, using local path:', uploadError)
-        finalVideoUrl = concatenatedPath.replace(path.join(process.cwd(), 'public'), '')
+        console.error('⚠️ R2 upload failed:', uploadError)
+        // In production, we can't use local paths - throw error
+        throw new Error(`Upload R2 failed: ${uploadError instanceof Error ? uploadError.message : String(uploadError)}`)
       }
     } else {
+      // Local dev fallback
+      console.log('⚠️ R2 not configured, using local path (dev only)')
       finalVideoUrl = concatenatedPath.replace(path.join(process.cwd(), 'public'), '')
     }
 

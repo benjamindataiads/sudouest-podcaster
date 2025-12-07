@@ -49,12 +49,20 @@ export async function POST(request: NextRequest) {
         {
           role: 'system',
           content: `Tu es un journaliste expert en rédaction de résumés concis et engageants. 
-Tu dois créer un résumé qui sera lu à haute voix, donc:
+Tu dois créer un résumé qui sera lu à haute voix par un système TTS, donc:
 - Utilise des phrases courtes et claires
 - Évite les acronymes ou explique-les
 - Le résumé doit durer environ ${durationSeconds} secondes à la lecture (environ ${targetWordCount} mots)
 - Commence directement par le contenu, pas de "Voici un résumé..."
-- Garde un ton informatif mais accessible`,
+- Garde un ton informatif mais accessible
+
+RÈGLES IMPORTANTES POUR LE TTS:
+- Écris TOUS les nombres en toutes lettres (ex: "vingt-cinq" au lieu de "25")
+- Écris les ordinaux en toutes lettres (ex: "premier" au lieu de "1er", "deuxième" au lieu de "2ème")
+- Pas d'abréviations: "Monsieur" au lieu de "M.", "numéro" au lieu de "n°", "environ" au lieu de "env."
+- Écris les dates en toutes lettres (ex: "le premier octobre deux mille vingt-cinq")
+- Écris les pourcentages en toutes lettres (ex: "quinze pour cent" au lieu de "15%")
+- Écris les unités en toutes lettres (ex: "kilomètres" au lieu de "km", "euros" au lieu de "€")`,
         },
         {
           role: 'user',

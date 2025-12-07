@@ -113,6 +113,10 @@ export default function AudioArticlePage() {
   const [playingId, setPlayingId] = useState<number | null>(null)
   const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null)
   
+  // Progress messages for loading states
+  const [summaryProgress, setSummaryProgress] = useState('')
+  const [audioProgress, setAudioProgress] = useState('')
+  
   // Clean up audio element when article.audioUrl changes (prevent cache issues)
   useEffect(() => {
     // When audioUrl changes, reset the audio element
@@ -220,6 +224,23 @@ export default function AudioArticlePage() {
     }
 
     setIsGeneratingSummary(true)
+    setSummaryProgress('Analyse du texte...')
+    
+    // Simulate progress messages
+    const progressMessages = [
+      'Analyse du texte...',
+      'Extraction des points clés...',
+      'Rédaction du résumé...',
+      'Optimisation pour la lecture audio...',
+      'Finalisation...',
+    ]
+    
+    let messageIndex = 0
+    const progressInterval = setInterval(() => {
+      messageIndex = (messageIndex + 1) % progressMessages.length
+      setSummaryProgress(progressMessages[messageIndex])
+    }, 2000)
+
     try {
       const response = await fetch('/api/audio-article/summarize', {
         method: 'POST',
@@ -229,6 +250,8 @@ export default function AudioArticlePage() {
           duration: article.summaryDuration,
         }),
       })
+
+      clearInterval(progressInterval)
 
       if (!response.ok) {
         throw new Error('Erreur lors de la génération du résumé')
@@ -242,6 +265,7 @@ export default function AudioArticlePage() {
       }))
       setCurrentStep(2)
     } catch (error) {
+      clearInterval(progressInterval)
       console.error('Error generating summary:', error)
       alert('Erreur lors de la génération du résumé')
     } finally {
@@ -249,7 +273,7 @@ export default function AudioArticlePage() {
     }
   }
 
-  // Step 3: Generate audio with Fal.ai Chatterbox
+  // Step 3: Generate audio with MiniMax TTS
   const handleGenerateAudio = async () => {
     if (!article.summary.trim()) {
       alert('Le résumé est vide')
@@ -257,6 +281,25 @@ export default function AudioArticlePage() {
     }
 
     setIsGeneratingAudio(true)
+    setAudioProgress('Préparation de la synthèse vocale...')
+    
+    // Simulate progress messages
+    const progressMessages = [
+      'Préparation de la synthèse vocale...',
+      'Envoi au serveur MiniMax...',
+      'Génération de l\'audio en cours...',
+      'Traitement de la voix...',
+      'Application des paramètres vocaux...',
+      'Finalisation de l\'audio...',
+      'Upload vers le stockage...',
+    ]
+    
+    let messageIndex = 0
+    const progressInterval = setInterval(() => {
+      messageIndex = (messageIndex + 1) % progressMessages.length
+      setAudioProgress(progressMessages[messageIndex])
+    }, 3000)
+
     try {
       const response = await fetch('/api/audio-article/generate-audio', {
         method: 'POST',
@@ -267,6 +310,8 @@ export default function AudioArticlePage() {
         }),
       })
 
+      clearInterval(progressInterval)
+
       if (!response.ok) {
         throw new Error('Erreur lors de la génération audio')
       }
@@ -275,10 +320,12 @@ export default function AudioArticlePage() {
       setArticle(prev => ({ ...prev, audioUrl: data.audioUrl }))
       setCurrentStep(4)
     } catch (error) {
+      clearInterval(progressInterval)
       console.error('Error generating audio:', error)
       alert('Erreur lors de la génération audio')
     } finally {
       setIsGeneratingAudio(false)
+      setAudioProgress('')
     }
   }
 
@@ -739,24 +786,34 @@ export default function AudioArticlePage() {
                         </div>
                       </div>
 
-                      <div className="flex justify-end">
-                        <Button
-                          onClick={handleGenerateSummary}
-                          disabled={!article.originalText.trim() || isGeneratingSummary}
+                      {/* Loading State */}
+                      {isGeneratingSummary && (
+                        <div 
+                          className="p-6 rounded-xl text-center"
+                          style={{ backgroundColor: 'var(--brand-accent)', color: 'white' }}
                         >
-                          {isGeneratingSummary ? (
-                            <>
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              Génération...
-                            </>
-                          ) : (
-                            <>
-                              Générer le résumé
-                              <ChevronRight className="h-4 w-4 ml-2" />
-                            </>
-                          )}
-                        </Button>
-                      </div>
+                          <div className="flex justify-center mb-4">
+                            <div className="relative">
+                              <div className="w-16 h-16 border-4 border-white/30 rounded-full"></div>
+                              <div className="absolute top-0 left-0 w-16 h-16 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+                            </div>
+                          </div>
+                          <p className="font-medium text-lg mb-2">Génération du résumé</p>
+                          <p className="text-white/80 text-sm animate-pulse">{summaryProgress}</p>
+                        </div>
+                      )}
+
+                      {!isGeneratingSummary && (
+                        <div className="flex justify-end">
+                          <Button
+                            onClick={handleGenerateSummary}
+                            disabled={!article.originalText.trim()}
+                          >
+                            Générer le résumé
+                            <ChevronRight className="h-4 w-4 ml-2" />
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -850,28 +907,50 @@ export default function AudioArticlePage() {
                         </div>
                       </div>
 
-                      <div className="flex justify-between">
-                        <Button variant="outline" onClick={() => setCurrentStep(2)}>
-                          <ChevronLeft className="h-4 w-4 mr-2" />
-                          Retour
-                        </Button>
-                        <Button
-                          onClick={handleGenerateAudio}
-                          disabled={isGeneratingAudio}
+                      {/* Loading State */}
+                      {isGeneratingAudio && (
+                        <div 
+                          className="p-6 rounded-xl text-center"
+                          style={{ backgroundColor: 'var(--brand-accent)', color: 'white' }}
                         >
-                          {isGeneratingAudio ? (
-                            <>
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              Génération audio...
-                            </>
-                          ) : (
-                            <>
-                              <Volume2 className="h-4 w-4 mr-2" />
-                              Générer l'audio
-                            </>
-                          )}
-                        </Button>
-                      </div>
+                          <div className="flex justify-center mb-4">
+                            <div className="relative">
+                              {/* Animated sound waves */}
+                              <div className="flex items-end gap-1 h-16">
+                                {[1, 2, 3, 4, 5].map((i) => (
+                                  <div
+                                    key={i}
+                                    className="w-3 bg-white/80 rounded-full"
+                                    style={{
+                                      animation: `soundWave 1s ease-in-out infinite`,
+                                      animationDelay: `${i * 0.1}s`,
+                                      height: '40%',
+                                    }}
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                          <p className="font-medium text-lg mb-2">Génération de l'audio</p>
+                          <p className="text-white/80 text-sm animate-pulse">{audioProgress}</p>
+                          <p className="text-white/60 text-xs mt-2">
+                            Cela peut prendre jusqu'à 30 secondes...
+                          </p>
+                        </div>
+                      )}
+
+                      {!isGeneratingAudio && (
+                        <div className="flex justify-between">
+                          <Button variant="outline" onClick={() => setCurrentStep(2)}>
+                            <ChevronLeft className="h-4 w-4 mr-2" />
+                            Retour
+                          </Button>
+                          <Button onClick={handleGenerateAudio}>
+                            <Volume2 className="h-4 w-4 mr-2" />
+                            Générer l'audio
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   )}
 

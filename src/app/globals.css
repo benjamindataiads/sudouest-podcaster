@@ -139,3 +139,23 @@
   background-color: var(--brand-secondary) !important;
 }
 
+/* Sound wave animation for audio loading */
+@keyframes soundWave {
+  0%, 100% {
+    height: 20%;
+  }
+  50% {
+    height: 100%;
+  }
+}
+
+/* Pulse animation for loading text */
+@keyframes pulseText {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+

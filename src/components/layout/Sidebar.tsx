@@ -23,11 +23,8 @@ import {
   Menu,
   X,
   ChevronRight,
-  ChevronDown,
   LogIn
 } from 'lucide-react'
-
-const isClerkConfigured = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
 
 interface NavItem {
   label: string
@@ -102,53 +99,39 @@ function OrgLogo() {
 export default function Sidebar() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const { orgRole } = useAuth()
-  const { organization } = useOrganization()
   const isAdmin = orgRole === 'org:admin'
 
   const sidebarContent = (
     <div className="flex flex-col h-full bg-white border-r border-gray-200">
       {/* Header with Logo + Org Switcher */}
       <div className="border-b border-gray-200">
-        {isClerkConfigured ? (
-          <>
-            <SignedIn>
-              {/* Custom header that wraps the org switcher */}
-              <OrganizationSwitcher 
-                hidePersonal={false}
-                afterCreateOrganizationUrl="/"
-                afterSelectOrganizationUrl="/"
-                afterLeaveOrganizationUrl="/"
-                appearance={{
-                  elements: {
-                    rootBox: "w-full",
-                    organizationSwitcherTrigger: "w-full flex items-center gap-3 p-4 hover:bg-gray-50 transition-colors cursor-pointer border-0 rounded-none",
-                    organizationPreviewMainIdentifier: "font-bold text-gray-900",
-                    organizationPreviewSecondaryIdentifier: "text-xs text-gray-500",
-                    organizationSwitcherTriggerIcon: "text-gray-400 ml-auto",
-                  }
-                }}
-              />
-            </SignedIn>
-            <SignedOut>
-              <div className="flex items-center gap-3 p-4">
-                <OrgLogo />
-                <div className="flex-1 min-w-0">
-                  <h1 className="font-bold text-gray-900 truncate">Podcaster</h1>
-                  <p className="text-xs text-gray-500">Créateur de podcasts IA</p>
-                </div>
-              </div>
-            </SignedOut>
-          </>
-        ) : (
+        <SignedIn>
+          {/* Organization Switcher - allows creating orgs */}
+          <OrganizationSwitcher 
+            hidePersonal={false}
+            afterCreateOrganizationUrl="/"
+            afterSelectOrganizationUrl="/"
+            afterLeaveOrganizationUrl="/"
+            appearance={{
+              elements: {
+                rootBox: "w-full",
+                organizationSwitcherTrigger: "w-full flex items-center gap-3 p-4 hover:bg-gray-50 transition-colors cursor-pointer border-0 rounded-none",
+                organizationPreviewMainIdentifier: "font-bold text-gray-900",
+                organizationPreviewSecondaryIdentifier: "text-xs text-gray-500",
+                organizationSwitcherTriggerIcon: "text-gray-400 ml-auto",
+              }
+            }}
+          />
+        </SignedIn>
+        <SignedOut>
           <div className="flex items-center gap-3 p-4">
             <OrgLogo />
             <div className="flex-1 min-w-0">
               <h1 className="font-bold text-gray-900 truncate">Podcaster</h1>
               <p className="text-xs text-gray-500">Créateur de podcasts IA</p>
             </div>
-            <ChevronDown className="h-4 w-4 text-gray-400" />
           </div>
-        )}
+        </SignedOut>
       </div>
 
       {/* Navigation */}
@@ -172,37 +155,29 @@ export default function Sidebar() {
         </Link>
 
         {/* User profile */}
-        {isClerkConfigured ? (
-          <>
-            <SignedIn>
-              <div className="flex items-center gap-3 px-3 py-2">
-                <UserButton 
-                  appearance={{
-                    elements: {
-                      avatarBox: "w-9 h-9"
-                    }
-                  }}
-                />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">Mon compte</p>
-                  <p className="text-xs text-gray-500">Gérer le profil</p>
-                </div>
-              </div>
-            </SignedIn>
-            <SignedOut>
-              <SignInButton mode="modal">
-                <Button className="w-full" variant="outline">
-                  <LogIn className="h-4 w-4 mr-2" />
-                  Connexion
-                </Button>
-              </SignInButton>
-            </SignedOut>
-          </>
-        ) : (
-          <div className="px-3 py-2 text-sm text-gray-500">
-            Mode démo
+        <SignedIn>
+          <div className="flex items-center gap-3 px-3 py-2">
+            <UserButton 
+              appearance={{
+                elements: {
+                  avatarBox: "w-9 h-9"
+                }
+              }}
+            />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-900 truncate">Mon compte</p>
+              <p className="text-xs text-gray-500">Gérer le profil</p>
+            </div>
           </div>
-        )}
+        </SignedIn>
+        <SignedOut>
+          <SignInButton mode="modal">
+            <Button className="w-full" variant="outline">
+              <LogIn className="h-4 w-4 mr-2" />
+              Connexion
+            </Button>
+          </SignInButton>
+        </SignedOut>
       </div>
     </div>
   )
@@ -245,4 +220,3 @@ export default function Sidebar() {
     </>
   )
 }
-

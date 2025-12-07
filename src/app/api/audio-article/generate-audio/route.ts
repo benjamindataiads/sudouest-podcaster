@@ -3,12 +3,15 @@ import { auth } from '@clerk/nextjs/server'
 import * as fal from '@fal-ai/serverless-client'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 120 // 2 minutes timeout
+export const maxDuration = 180 // 3 minutes timeout for parallel generation + merge
 
 // Configure fal client
 fal.config({
   credentials: process.env.FAL_KEY,
 })
+
+// Fixed seed for consistent voice generation
+const CHATTERBOX_SEED = 29994
 
 interface ChatterboxInput {
   text: string
@@ -17,6 +20,7 @@ interface ChatterboxInput {
   exaggeration?: number
   temperature?: number
   cfg_scale?: number
+  seed?: number
 }
 
 interface ChatterboxOutput {
@@ -30,6 +34,9 @@ interface ChatterboxOutput {
 /**
  * POST /api/audio-article/generate-audio
  * Generate audio using Fal.ai Chatterbox TTS
+ * - Chunks text into segments ≤300 chars
+ * - Generates all chunks IN PARALLEL with seed 29994
+ * - Merges audio files into one
  */
 export async function POST(request: NextRequest) {
   try {
@@ -47,53 +54,76 @@ export async function POST(request: NextRequest) {
     }
 
     // Chatterbox has a 300 character limit per request
-    // Split text into chunks if needed
-    const MAX_CHARS = 290 // Leave some margin
+    const MAX_CHARS = 295 // Leave margin for safety
     const chunks = splitTextIntoChunks(text, MAX_CHARS)
 
-    console.log(`🎤 Generating audio: ${text.length} chars, ${chunks.length} chunk(s), voice: ${voice}`)
+    console.log(`🎤 Generating audio: ${text.length} chars, ${chunks.length} chunk(s), voice: ${voice}, seed: ${CHATTERBOX_SEED}`)
+    chunks.forEach((chunk, i) => console.log(`  Chunk ${i + 1}: ${chunk.length} chars`))
 
-    const audioUrls: string[] = []
+    // Generate all chunks IN PARALLEL
+    console.log(`⚡ Starting parallel generation of ${chunks.length} chunks...`)
+    
+    const generateChunk = async (chunkText: string, index: number): Promise<{ index: number; url: string | null }> => {
+      try {
+        console.log(`  🔊 Chunk ${index + 1}/${chunks.length} starting...`)
+        
+        const input: ChatterboxInput = {
+          text: chunkText,
+          voice: voice,
+          exaggeration: 0.5,
+          temperature: 0.8,
+          cfg_scale: 0.5,
+          seed: CHATTERBOX_SEED, // Fixed seed for consistency
+        }
 
-    for (let i = 0; i < chunks.length; i++) {
-      console.log(`  Processing chunk ${i + 1}/${chunks.length}: ${chunks[i].length} chars`)
-      
-      const input: ChatterboxInput = {
-        text: chunks[i],
-        voice: voice,
-        exaggeration: 0.5,
-        temperature: 0.8,
-        cfg_scale: 0.5,
-      }
+        const result = await fal.subscribe('fal-ai/chatterbox/text-to-speech/multilingual', {
+          input,
+          logs: false,
+        }) as ChatterboxOutput
 
-      const result = await fal.subscribe('fal-ai/chatterbox/text-to-speech/multilingual', {
-        input,
-        logs: true,
-        onQueueUpdate: (update) => {
-          if (update.status === 'IN_PROGRESS') {
-            console.log(`    Chunk ${i + 1}: ${update.status}`)
-          }
-        },
-      }) as ChatterboxOutput
-
-      if (result.audio?.url) {
-        audioUrls.push(result.audio.url)
-        console.log(`  ✅ Chunk ${i + 1} completed: ${result.audio.url}`)
+        if (result.audio?.url) {
+          console.log(`  ✅ Chunk ${index + 1} completed`)
+          return { index, url: result.audio.url }
+        }
+        
+        console.warn(`  ⚠️ Chunk ${index + 1} returned no audio`)
+        return { index, url: null }
+      } catch (error) {
+        console.error(`  ❌ Chunk ${index + 1} failed:`, error)
+        return { index, url: null }
       }
     }
+
+    // Run all generations in parallel
+    const results = await Promise.all(
+      chunks.map((chunk, index) => generateChunk(chunk, index))
+    )
+
+    // Sort by index to maintain order
+    results.sort((a, b) => a.index - b.index)
+    
+    // Filter successful results
+    const audioUrls = results
+      .filter(r => r.url !== null)
+      .map(r => r.url as string)
 
     if (audioUrls.length === 0) {
       throw new Error('Aucun audio généré')
     }
 
-    // If multiple chunks, we would need to concatenate them
-    // For now, return the first one or concatenate server-side
+    console.log(`✅ ${audioUrls.length}/${chunks.length} chunks generated successfully`)
+
+    // Merge audio files if multiple chunks
     let finalAudioUrl = audioUrls[0]
     
     if (audioUrls.length > 1) {
-      // Concatenate audio files
-      console.log(`🔗 Concatenating ${audioUrls.length} audio chunks...`)
-      const concatResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/audio/merge`, {
+      console.log(`🔗 Merging ${audioUrls.length} audio chunks...`)
+      
+      // Use internal merge API
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL || 'http://localhost:3000'
+      const mergeUrl = baseUrl.startsWith('http') ? `${baseUrl}/api/audio/merge` : `https://${baseUrl}/api/audio/merge`
+      
+      const concatResponse = await fetch(mergeUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ audioUrls }),
@@ -102,17 +132,21 @@ export async function POST(request: NextRequest) {
       if (concatResponse.ok) {
         const concatData = await concatResponse.json()
         finalAudioUrl = concatData.audioUrl
-        console.log(`✅ Audio concatenated: ${finalAudioUrl}`)
+        console.log(`✅ Audio merged: ${finalAudioUrl}`)
       } else {
-        console.warn('⚠️ Concatenation failed, using first chunk')
+        const errorText = await concatResponse.text()
+        console.error('⚠️ Merge failed:', errorText)
+        // Fallback: return first chunk
+        console.log('⚠️ Using first chunk as fallback')
       }
     }
 
-    console.log(`✅ Audio generation complete: ${finalAudioUrl}`)
+    console.log(`🎉 Audio generation complete: ${finalAudioUrl}`)
 
     return NextResponse.json({
       audioUrl: finalAudioUrl,
       chunks: audioUrls.length,
+      totalChunks: chunks.length,
     })
   } catch (error) {
     console.error('Error generating audio:', error)

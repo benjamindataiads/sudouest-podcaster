@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 export const dynamic = 'force-dynamic'
+export const maxDuration = 120 // 2 minutes for large merges
 import { promises as fs } from 'fs'
 import path from 'path'
 import { execSync } from 'child_process'
@@ -7,87 +8,102 @@ import { put } from '@vercel/blob'
 
 /**
  * POST /api/audio/merge
- * Merge deux fichiers audio en utilisant FFmpeg et upload sur Vercel Blob
+ * Merge multiple audio files using FFmpeg and upload to Vercel Blob
+ * Supports both legacy (url1, url2) and new (audioUrls array) formats
  */
 export async function POST(request: NextRequest) {
+  const tempFiles: string[] = []
+  
   try {
     const body = await request.json()
-    const { url1, url2, batchIndex } = body
-
-    if (!url1 || !url2) {
+    
+    // Support both old format (url1, url2) and new format (audioUrls array)
+    let urls: string[] = []
+    const batchIndex = body.batchIndex || Date.now()
+    
+    if (body.audioUrls && Array.isArray(body.audioUrls)) {
+      urls = body.audioUrls
+    } else if (body.url1 && body.url2) {
+      urls = [body.url1, body.url2]
+    } else {
       return NextResponse.json(
-        { error: 'Deux URLs audio sont requises' },
+        { error: 'audioUrls array or url1+url2 required' },
         { status: 400 }
       )
     }
 
-    console.log(`Merging audio chunks ${batchIndex}: ${url1} + ${url2}`)
+    if (urls.length < 2) {
+      return NextResponse.json(
+        { error: 'At least 2 audio URLs required' },
+        { status: 400 }
+      )
+    }
 
-    // Créer le dossier temp si nécessaire
+    console.log(`🔗 Merging ${urls.length} audio files...`)
+
+    // Create temp directory
     const tempDir = path.join(process.cwd(), 'public', 'temp')
     await fs.mkdir(tempDir, { recursive: true })
 
-    // Paths locaux temporaires
-    const temp1 = path.join(tempDir, `audio1_${batchIndex}_${Date.now()}.mp3`)
-    const temp2 = path.join(tempDir, `audio2_${batchIndex}_${Date.now()}.mp3`)
-    const outputPath = path.join(tempDir, `merged_${batchIndex}_${Date.now()}.mp3`)
-    const listFile = path.join(tempDir, `list_${batchIndex}_${Date.now()}.txt`)
+    const timestamp = Date.now()
+    const outputPath = path.join(tempDir, `merged_${batchIndex}_${timestamp}.mp3`)
+    const listFile = path.join(tempDir, `list_${batchIndex}_${timestamp}.txt`)
+    tempFiles.push(listFile, outputPath)
 
-    try {
-      // Télécharger les fichiers audio
-      console.log(`Downloading audio 1...`)
-      const audio1Response = await fetch(url1)
-      const audio1Buffer = Buffer.from(await audio1Response.arrayBuffer())
-      await fs.writeFile(temp1, audio1Buffer)
+    // Download all audio files in parallel
+    console.log(`📥 Downloading ${urls.length} audio files...`)
+    const downloadPromises = urls.map(async (url, index) => {
+      const tempPath = path.join(tempDir, `audio_${batchIndex}_${index}_${timestamp}.mp3`)
+      tempFiles.push(tempPath)
+      
+      const response = await fetch(url)
+      if (!response.ok) {
+        throw new Error(`Failed to download audio ${index + 1}: ${response.status}`)
+      }
+      const buffer = Buffer.from(await response.arrayBuffer())
+      await fs.writeFile(tempPath, buffer)
+      
+      console.log(`  ✅ Downloaded audio ${index + 1}/${urls.length}`)
+      return tempPath
+    })
 
-      console.log(`Downloading audio 2...`)
-      const audio2Response = await fetch(url2)
-      const audio2Buffer = Buffer.from(await audio2Response.arrayBuffer())
-      await fs.writeFile(temp2, audio2Buffer)
+    const downloadedPaths = await Promise.all(downloadPromises)
 
-      // Créer le fichier de liste pour FFmpeg
-      const listContent = `file '${temp1}'\nfile '${temp2}'`
-      await fs.writeFile(listFile, listContent)
+    // Create FFmpeg concat list file
+    const listContent = downloadedPaths.map(p => `file '${p}'`).join('\n')
+    await fs.writeFile(listFile, listContent)
 
-      // Merger avec FFmpeg
-      console.log(`Merging audio files with FFmpeg...`)
-      execSync(
-        `ffmpeg -f concat -safe 0 -i "${listFile}" -c copy "${outputPath}" -y`,
-        { stdio: 'pipe' }
-      )
+    // Merge with FFmpeg
+    console.log(`🎬 Merging with FFmpeg...`)
+    execSync(
+      `ffmpeg -f concat -safe 0 -i "${listFile}" -c copy "${outputPath}" -y`,
+      { stdio: 'pipe' }
+    )
 
-      // Upload le fichier mergé sur Vercel Blob pour le rendre accessible publiquement
-      console.log('Uploading merged audio to Vercel Blob...')
-      const mergedBuffer = await fs.readFile(outputPath)
-      const blob = await put(`audio/merged_${batchIndex}_${Date.now()}.mp3`, mergedBuffer, {
-        access: 'public',
-        contentType: 'audio/mpeg',
-      })
+    // Upload merged file to Vercel Blob
+    console.log('📤 Uploading merged audio to Vercel Blob...')
+    const mergedBuffer = await fs.readFile(outputPath)
+    const blob = await put(`audio/merged_${batchIndex}_${timestamp}.mp3`, mergedBuffer, {
+      access: 'public',
+      contentType: 'audio/mpeg',
+    })
 
-      // Nettoyer les fichiers temporaires
-      await fs.unlink(temp1)
-      await fs.unlink(temp2)
-      await fs.unlink(listFile)
-      await fs.unlink(outputPath)
+    // Cleanup temp files
+    console.log('🧹 Cleaning up temp files...')
+    await Promise.all(tempFiles.map(f => fs.unlink(f).catch(() => {})))
 
-      console.log(`✅ Merged audio uploaded to: ${blob.url}`)
+    console.log(`✅ Merged audio uploaded: ${blob.url}`)
 
-      return NextResponse.json({
-        url: blob.url,
-        success: true,
-      })
-    } catch (error) {
-      // Nettoyer en cas d'erreur
-      try {
-        await fs.unlink(temp1).catch(() => {})
-        await fs.unlink(temp2).catch(() => {})
-        await fs.unlink(listFile).catch(() => {})
-        await fs.unlink(outputPath).catch(() => {})
-      } catch {}
-
-      throw error
-    }
+    return NextResponse.json({
+      audioUrl: blob.url,
+      url: blob.url, // Legacy compatibility
+      success: true,
+      mergedCount: urls.length,
+    })
   } catch (error) {
+    // Cleanup on error
+    await Promise.all(tempFiles.map(f => fs.unlink(f).catch(() => {})))
+
     console.error('Error merging audio files:', error)
     return NextResponse.json(
       {

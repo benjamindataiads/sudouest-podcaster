@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { db, avatars } from '@/lib/db'
-import { eq, or, isNull } from 'drizzle-orm'
+import { eq, or } from 'drizzle-orm'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,25 +29,23 @@ export async function GET() {
     let allAvatars
 
     if (orgId) {
-      // Org mode: show default + org's avatars + legacy avatars
+      // Org mode: show default + ONLY this org's avatars (strict filtering)
       allAvatars = await db
         .select()
         .from(avatars)
         .where(or(
           eq(avatars.isDefault, true),
-          eq(avatars.orgId, orgId),
-          isNull(avatars.orgId) // Legacy avatars without orgId
+          eq(avatars.orgId, orgId)
         ))
         .orderBy(avatars.createdAt)
     } else {
-      // Personal mode: show default + user's personal avatars (no org)
+      // Personal mode: show default + user's personal avatars (without any org)
       allAvatars = await db
         .select()
         .from(avatars)
         .where(or(
           eq(avatars.isDefault, true),
-          eq(avatars.userId, userId),
-          isNull(avatars.userId) // Legacy avatars
+          eq(avatars.userId, userId)
         ))
         .orderBy(avatars.createdAt)
     }

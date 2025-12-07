@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { db, podcasts } from '@/lib/db'
-import { desc, eq, or, isNull, and } from 'drizzle-orm'
+import { desc, eq, isNull, and } from 'drizzle-orm'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,15 +23,15 @@ export async function GET() {
     let latestPodcasts
 
     if (orgId) {
-      // If org selected: show org's podcasts OR legacy podcasts without orgId (for migration)
+      // If org selected: show ONLY this org's podcasts (strict filtering)
       latestPodcasts = await db
         .select()
         .from(podcasts)
-        .where(or(eq(podcasts.orgId, orgId), isNull(podcasts.orgId)))
+        .where(eq(podcasts.orgId, orgId))
         .orderBy(desc(podcasts.createdAt))
         .limit(50)
     } else {
-      // No org selected: show user's personal podcasts
+      // No org selected: show user's personal podcasts (without any org)
       latestPodcasts = await db
         .select()
         .from(podcasts)

@@ -1,22 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { db, avatars } from '@/lib/db'
-import { eq, or } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 
 export const dynamic = 'force-dynamic'
 
-// Default avatar data
-const DEFAULT_AVATAR = {
-  name: 'Benoit Lasserre',
-  voiceUrl: 'https://dataiads-test1.fr/sudouest/voix.mp3',
-  imageUrl: 'https://dataiads-test1.fr/sudouest/avatarsudsouest.png',
-  isDefault: true,
-  userId: null as string | null, // Default avatars have no user
-}
-
 /**
  * GET /api/avatars
- * Get avatars: default avatars + org/user's custom avatars
+ * Get avatars: only org/user's custom avatars
  */
 export async function GET() {
   try {
@@ -29,36 +20,19 @@ export async function GET() {
     let allAvatars
 
     if (orgId) {
-      // Org mode: show default + ONLY this org's avatars (strict filtering)
+      // Org mode: show ONLY this org's avatars
       allAvatars = await db
         .select()
         .from(avatars)
-        .where(or(
-          eq(avatars.isDefault, true),
-          eq(avatars.orgId, orgId)
-        ))
+        .where(eq(avatars.orgId, orgId))
         .orderBy(avatars.createdAt)
     } else {
-      // Personal mode: show default + user's personal avatars (without any org)
+      // Personal mode: show user's personal avatars
       allAvatars = await db
         .select()
         .from(avatars)
-        .where(or(
-          eq(avatars.isDefault, true),
-          eq(avatars.userId, userId)
-        ))
+        .where(eq(avatars.userId, userId))
         .orderBy(avatars.createdAt)
-    }
-    
-    // If no avatars exist, create the default one
-    if (allAvatars.length === 0) {
-      const [defaultAvatar] = await db
-        .insert(avatars)
-        .values(DEFAULT_AVATAR)
-        .returning()
-      
-      allAvatars = [defaultAvatar]
-      console.log('✅ Created default avatar: Benoit Lasserre')
     }
     
     return NextResponse.json({ avatars: allAvatars, orgId })

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import * as fal from '@fal-ai/serverless-client'
+import { put } from '@vercel/blob'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 180 // 3 minutes timeout for parallel generation + merge
@@ -36,7 +37,7 @@ interface ChatterboxOutput {
  * Generate audio using Fal.ai Chatterbox TTS
  * - Chunks text into segments ≤300 chars
  * - Generates all chunks IN PARALLEL with seed 29994
- * - Merges audio files into one
+ * - Merges audio files into one (WAV concatenation)
  */
 export async function POST(request: NextRequest) {
   try {
@@ -63,7 +64,7 @@ export async function POST(request: NextRequest) {
     // Generate all chunks IN PARALLEL
     console.log(`⚡ Starting parallel generation of ${chunks.length} chunks...`)
     
-    const generateChunk = async (chunkText: string, index: number): Promise<{ index: number; url: string | null }> => {
+    const generateChunk = async (chunkText: string, index: number): Promise<{ index: number; url: string | null; buffer: Buffer | null }> => {
       try {
         console.log(`  🔊 Chunk ${index + 1}/${chunks.length} starting...`)
         
@@ -82,15 +83,18 @@ export async function POST(request: NextRequest) {
         }) as ChatterboxOutput
 
         if (result.audio?.url) {
-          console.log(`  ✅ Chunk ${index + 1} completed`)
-          return { index, url: result.audio.url }
+          console.log(`  ✅ Chunk ${index + 1} completed, downloading...`)
+          // Download the audio buffer immediately for merging
+          const audioResponse = await fetch(result.audio.url)
+          const buffer = Buffer.from(await audioResponse.arrayBuffer())
+          return { index, url: result.audio.url, buffer }
         }
         
         console.warn(`  ⚠️ Chunk ${index + 1} returned no audio`)
-        return { index, url: null }
+        return { index, url: null, buffer: null }
       } catch (error) {
         console.error(`  ❌ Chunk ${index + 1} failed:`, error)
-        return { index, url: null }
+        return { index, url: null, buffer: null }
       }
     }
 
@@ -103,49 +107,42 @@ export async function POST(request: NextRequest) {
     results.sort((a, b) => a.index - b.index)
     
     // Filter successful results
-    const audioUrls = results
-      .filter(r => r.url !== null)
-      .map(r => r.url as string)
+    const successfulResults = results.filter(r => r.buffer !== null)
 
-    if (audioUrls.length === 0) {
+    if (successfulResults.length === 0) {
       throw new Error('Aucun audio généré')
     }
 
-    console.log(`✅ ${audioUrls.length}/${chunks.length} chunks generated successfully`)
+    console.log(`✅ ${successfulResults.length}/${chunks.length} chunks generated successfully`)
 
-    // Merge audio files if multiple chunks
-    let finalAudioUrl = audioUrls[0]
-    
-    if (audioUrls.length > 1) {
-      console.log(`🔗 Merging ${audioUrls.length} audio chunks...`)
+    let finalAudioUrl: string
+
+    if (successfulResults.length === 1) {
+      // Only one chunk, use its URL directly
+      finalAudioUrl = successfulResults[0].url!
+    } else {
+      // Multiple chunks: merge WAV files
+      console.log(`🔗 Merging ${successfulResults.length} WAV audio chunks...`)
       
-      // Use internal merge API
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL || 'http://localhost:3000'
-      const mergeUrl = baseUrl.startsWith('http') ? `${baseUrl}/api/audio/merge` : `https://${baseUrl}/api/audio/merge`
+      const buffers = successfulResults.map(r => r.buffer!)
+      const mergedBuffer = mergeWavBuffers(buffers)
       
-      const concatResponse = await fetch(mergeUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ audioUrls }),
+      // Upload merged audio to Vercel Blob
+      console.log('📤 Uploading merged audio...')
+      const blob = await put(`audio-articles/merged_${Date.now()}.wav`, mergedBuffer, {
+        access: 'public',
+        contentType: 'audio/wav',
       })
       
-      if (concatResponse.ok) {
-        const concatData = await concatResponse.json()
-        finalAudioUrl = concatData.audioUrl
-        console.log(`✅ Audio merged: ${finalAudioUrl}`)
-      } else {
-        const errorText = await concatResponse.text()
-        console.error('⚠️ Merge failed:', errorText)
-        // Fallback: return first chunk
-        console.log('⚠️ Using first chunk as fallback')
-      }
+      finalAudioUrl = blob.url
+      console.log(`✅ Audio merged and uploaded: ${finalAudioUrl}`)
     }
 
     console.log(`🎉 Audio generation complete: ${finalAudioUrl}`)
 
     return NextResponse.json({
       audioUrl: finalAudioUrl,
-      chunks: audioUrls.length,
+      chunks: successfulResults.length,
       totalChunks: chunks.length,
     })
   } catch (error) {
@@ -158,6 +155,60 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
+}
+
+/**
+ * Merge multiple WAV buffers into a single WAV file
+ * Assumes all WAV files have the same format (sample rate, channels, bit depth)
+ */
+function mergeWavBuffers(buffers: Buffer[]): Buffer {
+  if (buffers.length === 0) throw new Error('No buffers to merge')
+  if (buffers.length === 1) return buffers[0]
+
+  // WAV header is 44 bytes
+  const WAV_HEADER_SIZE = 44
+
+  // Extract audio data from each WAV (skip header)
+  const audioDataChunks: Buffer[] = buffers.map(buf => buf.subarray(WAV_HEADER_SIZE))
+  
+  // Calculate total audio data length
+  const totalAudioLength = audioDataChunks.reduce((sum, chunk) => sum + chunk.length, 0)
+  
+  // Read format info from first WAV header
+  const firstBuffer = buffers[0]
+  const numChannels = firstBuffer.readUInt16LE(22)
+  const sampleRate = firstBuffer.readUInt32LE(24)
+  const bitsPerSample = firstBuffer.readUInt16LE(34)
+  const byteRate = firstBuffer.readUInt32LE(28)
+  const blockAlign = firstBuffer.readUInt16LE(32)
+  
+  console.log(`  WAV format: ${sampleRate}Hz, ${numChannels}ch, ${bitsPerSample}bit`)
+  
+  // Create new WAV header with updated sizes
+  const totalFileSize = WAV_HEADER_SIZE + totalAudioLength - 8 // File size minus "RIFF" and size field
+  const header = Buffer.alloc(WAV_HEADER_SIZE)
+  
+  // RIFF header
+  header.write('RIFF', 0)
+  header.writeUInt32LE(totalFileSize, 4)
+  header.write('WAVE', 8)
+  
+  // fmt subchunk
+  header.write('fmt ', 12)
+  header.writeUInt32LE(16, 16) // Subchunk1Size (16 for PCM)
+  header.writeUInt16LE(1, 20) // AudioFormat (1 = PCM)
+  header.writeUInt16LE(numChannels, 22)
+  header.writeUInt32LE(sampleRate, 24)
+  header.writeUInt32LE(byteRate, 28)
+  header.writeUInt16LE(blockAlign, 32)
+  header.writeUInt16LE(bitsPerSample, 34)
+  
+  // data subchunk
+  header.write('data', 36)
+  header.writeUInt32LE(totalAudioLength, 40)
+  
+  // Concatenate header and all audio data
+  return Buffer.concat([header, ...audioDataChunks])
 }
 
 /**

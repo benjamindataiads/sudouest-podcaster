@@ -4,12 +4,19 @@ import OpenAI from 'openai'
 
 export const dynamic = 'force-dynamic'
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
-
 // Approximate words per second for speech (varies by language)
 const WORDS_PER_SECOND = 2.5
+
+// Lazy-load OpenAI client to avoid build-time errors
+let openaiClient: OpenAI | null = null
+function getOpenAI(): OpenAI {
+  if (!openaiClient) {
+    openaiClient = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    })
+  }
+  return openaiClient
+}
 
 /**
  * POST /api/audio-article/summarize
@@ -35,6 +42,7 @@ export async function POST(request: NextRequest) {
 
     console.log(`📝 Summarizing article for ~${durationSeconds}s (~${targetWordCount} words)`)
 
+    const openai = getOpenAI()
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [

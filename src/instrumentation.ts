@@ -153,6 +153,33 @@ export async function register() {
       `)
       console.log('✅ avatars.org_id column verified')
 
+      // ============================================
+      // AUDIO ARTICLES TABLE
+      // ============================================
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS audio_articles (
+          id SERIAL PRIMARY KEY,
+          user_id VARCHAR(255),
+          org_id VARCHAR(255),
+          title VARCHAR(255) NOT NULL,
+          original_text TEXT NOT NULL,
+          summary TEXT NOT NULL,
+          summary_duration VARCHAR(10),
+          audio_url TEXT,
+          voice VARCHAR(50) DEFAULT 'french',
+          status VARCHAR(50) DEFAULT 'draft',
+          created_at TIMESTAMP DEFAULT NOW() NOT NULL,
+          updated_at TIMESTAMP DEFAULT NOW() NOT NULL
+        )
+      `)
+      await db.execute(sql`
+        CREATE INDEX IF NOT EXISTS audio_articles_user_id_idx ON audio_articles(user_id)
+      `)
+      await db.execute(sql`
+        CREATE INDEX IF NOT EXISTS audio_articles_org_id_idx ON audio_articles(org_id)
+      `)
+      console.log('✅ audio_articles table verified')
+
       console.log('✅ Database migrations completed successfully')
     } catch (error) {
       console.error('⚠️ Migration error (non-blocking):', error)

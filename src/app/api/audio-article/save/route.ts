@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { db, audioArticles } from '@/lib/db'
-import { eq, desc, and, isNull, or } from 'drizzle-orm'
+import { eq, desc, and, isNull } from 'drizzle-orm'
 
 export const dynamic = 'force-dynamic'
 
@@ -99,6 +99,67 @@ export async function POST(request: NextRequest) {
     console.error('Error saving audio article:', error)
     return NextResponse.json(
       { error: 'Erreur lors de la sauvegarde' },
+      { status: 500 }
+    )
+  }
+}
+
+/**
+ * DELETE /api/audio-article/save?id=123
+ * Delete an audio article
+ */
+export async function DELETE(request: NextRequest) {
+  try {
+    const { userId, orgId } = await auth()
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
+    }
+
+    const searchParams = request.nextUrl.searchParams
+    const id = searchParams.get('id')
+
+    if (!id) {
+      return NextResponse.json({ error: 'ID manquant' }, { status: 400 })
+    }
+
+    const articleId = parseInt(id)
+
+    // Check ownership before deleting
+    const [article] = await db
+      .select()
+      .from(audioArticles)
+      .where(eq(audioArticles.id, articleId))
+      .limit(1)
+
+    if (!article) {
+      return NextResponse.json({ error: 'Article non trouvé' }, { status: 404 })
+    }
+
+    // Verify ownership
+    if (orgId) {
+      if (article.orgId !== orgId) {
+        return NextResponse.json({ error: 'Non autorisé' }, { status: 403 })
+      }
+    } else {
+      if (article.userId !== userId) {
+        return NextResponse.json({ error: 'Non autorisé' }, { status: 403 })
+      }
+    }
+
+    console.log(`🗑️ Deleting audio article: ID ${articleId}`)
+
+    await db.delete(audioArticles).where(eq(audioArticles.id, articleId))
+
+    console.log(`✅ Audio article deleted: ID ${articleId}`)
+
+    return NextResponse.json({
+      message: 'Audio article supprimé',
+    })
+  } catch (error) {
+    console.error('Error deleting audio article:', error)
+    return NextResponse.json(
+      { error: 'Erreur lors de la suppression' },
       { status: 500 }
     )
   }

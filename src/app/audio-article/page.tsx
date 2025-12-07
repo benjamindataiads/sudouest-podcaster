@@ -24,7 +24,8 @@ import {
   Plus,
   Clock,
   ArrowLeft,
-  Mic
+  Mic,
+  Trash2
 } from 'lucide-react'
 
 type Step = 1 | 2 | 3 | 4
@@ -269,6 +270,35 @@ export default function AudioArticlePage() {
     }
   }
 
+  // Delete audio article
+  const handleDeleteArticle = async (articleId: number) => {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer cet Audio Article ?')) {
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/audio-article/save?id=${articleId}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        throw new Error('Erreur lors de la suppression')
+      }
+
+      // Remove from local state
+      setSavedArticles(prev => prev.filter(a => a.id !== articleId))
+      
+      // Stop audio if playing
+      if (playingId === articleId && audioElement) {
+        audioElement.pause()
+        setPlayingId(null)
+      }
+    } catch (error) {
+      console.error('Error deleting article:', error)
+      alert('Erreur lors de la suppression')
+    }
+  }
+
   // Audio playback for list items
   const playArticleAudio = (articleItem: SavedAudioArticle) => {
     if (!articleItem.audioUrl) return
@@ -414,12 +444,21 @@ export default function AudioArticlePage() {
                             </div>
                             <a
                               href={item.audioUrl}
-                              download={`${item.title}.wav`}
+                              download={`${item.title}.mp3`}
                               onClick={(e) => e.stopPropagation()}
                               className="p-2 rounded-full hover:bg-white/20 transition-colors"
                             >
                               <Download className="h-5 w-5 text-white" />
                             </a>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleDeleteArticle(item.id)
+                              }}
+                              className="p-2 rounded-full hover:bg-red-500/50 transition-colors"
+                            >
+                              <Trash2 className="h-5 w-5 text-white" />
+                            </button>
                           </div>
                         )}
 
@@ -436,11 +475,25 @@ export default function AudioArticlePage() {
                           >
                             {item.summary}
                           </p>
-                          <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--brand-text)', opacity: 0.5 }}>
-                            <Clock className="h-3 w-3" />
-                            <span>{formatDate(item.createdAt)}</span>
-                            <span className="mx-1">•</span>
-                            <span>~{item.summaryDuration}s</span>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--brand-text)', opacity: 0.5 }}>
+                              <Clock className="h-3 w-3" />
+                              <span>{formatDate(item.createdAt)}</span>
+                              <span className="mx-1">•</span>
+                              <span>~{item.summaryDuration}s</span>
+                            </div>
+                            {!item.audioUrl && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleDeleteArticle(item.id)
+                                }}
+                                className="p-1.5 rounded-full hover:bg-red-100 transition-colors"
+                                style={{ color: 'var(--brand-text)', opacity: 0.5 }}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            )}
                           </div>
                         </div>
                       </CardContent>

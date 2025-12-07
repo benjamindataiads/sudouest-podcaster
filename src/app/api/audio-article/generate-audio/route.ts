@@ -77,11 +77,12 @@ export async function POST(request: NextRequest) {
       text: text,
       voice_setting: {
         voice_id: voiceId,
-        speed: 1,
+        speed: 1.1,
         vol: 1,
         pitch: 0,
+        emotion: 'neutral',
       },
-      language_boost: 'French',
+      language_boost: 'French', // Always French for better pronunciation
       audio_setting: {
         format: 'mp3',
         sample_rate: 32000,

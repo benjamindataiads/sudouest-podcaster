@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import * as fal from '@fal-ai/serverless-client'
-import { put } from '@vercel/blob'
+import { uploadBuffer } from '@/lib/services/storage'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 180 // 3 minutes timeout for parallel generation + merge
@@ -127,14 +127,10 @@ export async function POST(request: NextRequest) {
       const buffers = successfulResults.map(r => r.buffer!)
       const mergedBuffer = mergeWavBuffers(buffers)
       
-      // Upload merged audio to Vercel Blob
-      console.log('📤 Uploading merged audio...')
-      const blob = await put(`audio-articles/merged_${Date.now()}.wav`, mergedBuffer, {
-        access: 'public',
-        contentType: 'audio/wav',
-      })
-      
-      finalAudioUrl = blob.url
+      // Upload merged audio to R2
+      console.log('📤 Uploading merged audio to R2...')
+      const key = `audio-articles/merged_${Date.now()}.wav`
+      finalAudioUrl = await uploadBuffer(mergedBuffer, key, 'audio/wav')
       console.log(`✅ Audio merged and uploaded: ${finalAudioUrl}`)
     }
 

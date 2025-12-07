@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 export const dynamic = 'force-dynamic'
 import { auth } from '@clerk/nextjs/server'
 import { db, podcasts, audioFiles, videoFiles, avatars } from '@/lib/db'
-import { eq } from 'drizzle-orm'
+import { eq, and } from 'drizzle-orm'
 
 /**
  * GET /api/podcasts/[id]
@@ -13,7 +13,7 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { userId } = await auth()
+    const { userId, orgId } = await auth()
     
     if (!userId) {
       return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
@@ -28,22 +28,31 @@ export async function GET(
       )
     }
 
-    const [podcast] = await db
-      .select()
-      .from(podcasts)
-      .where(eq(podcasts.id, podcastId))
-      .limit(1)
+    // Fetch podcast with org filter
+    let podcast
+    if (orgId) {
+      // Org mode: podcast must belong to this org
+      const [result] = await db
+        .select()
+        .from(podcasts)
+        .where(and(eq(podcasts.id, podcastId), eq(podcasts.orgId, orgId)))
+        .limit(1)
+      podcast = result
+    } else {
+      // Personal mode: podcast must belong to this user and have no org
+      const [result] = await db
+        .select()
+        .from(podcasts)
+        .where(and(eq(podcasts.id, podcastId), eq(podcasts.userId, userId)))
+        .limit(1)
+      podcast = result
+    }
 
     if (!podcast) {
       return NextResponse.json(
         { error: 'Podcast non trouvé' },
         { status: 404 }
       )
-    }
-
-    // Check ownership (allow access if userId matches OR if legacy podcast without userId)
-    if (podcast.userId && podcast.userId !== userId) {
-      return NextResponse.json({ error: 'Non autorisé' }, { status: 403 })
     }
 
     // Load avatar if avatarId exists
@@ -89,14 +98,14 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { userId } = await auth()
+    const { userId, orgId } = await auth()
     
     if (!userId) {
       return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
     }
 
     const podcastId = parseInt(params.id)
-    console.log('Delete podcast request:', podcastId, 'by user:', userId)
+    console.log('Delete podcast request:', podcastId, 'by user:', userId, 'org:', orgId)
 
     if (isNaN(podcastId)) {
       return NextResponse.json(
@@ -105,23 +114,29 @@ export async function DELETE(
       )
     }
 
-    // Vérifier que le podcast existe
-    const [existingPodcast] = await db
-      .select()
-      .from(podcasts)
-      .where(eq(podcasts.id, podcastId))
-      .limit(1)
+    // Verify podcast exists AND belongs to this org/user
+    let existingPodcast
+    if (orgId) {
+      const [result] = await db
+        .select()
+        .from(podcasts)
+        .where(and(eq(podcasts.id, podcastId), eq(podcasts.orgId, orgId)))
+        .limit(1)
+      existingPodcast = result
+    } else {
+      const [result] = await db
+        .select()
+        .from(podcasts)
+        .where(and(eq(podcasts.id, podcastId), eq(podcasts.userId, userId)))
+        .limit(1)
+      existingPodcast = result
+    }
 
     if (!existingPodcast) {
       return NextResponse.json(
         { error: 'Podcast non trouvé' },
         { status: 404 }
       )
-    }
-
-    // Check ownership (allow delete if userId matches OR if legacy podcast without userId)
-    if (existingPodcast.userId && existingPodcast.userId !== userId) {
-      return NextResponse.json({ error: 'Non autorisé' }, { status: 403 })
     }
 
     // Supprimer les jobs vidéo associés (ajouté pour éviter contrainte FK)

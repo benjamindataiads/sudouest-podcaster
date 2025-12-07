@@ -1,35 +1,78 @@
 import { NextRequest, NextResponse } from 'next/server'
 export const dynamic = 'force-dynamic'
-import { db, videoJobs } from '@/lib/db'
-import { eq, or, and } from 'drizzle-orm'
+import { auth } from '@clerk/nextjs/server'
+import { db, videoJobs, podcasts } from '@/lib/db'
+import { eq, and, inArray } from 'drizzle-orm'
 
 /**
  * GET /api/video-jobs
- * Récupère tous les jobs vidéo (ou filtrés par podcast/status)
+ * Récupère les jobs vidéo filtrés par organisation
  */
 export async function GET(request: NextRequest) {
   try {
+    const { userId, orgId } = await auth()
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
+    }
+
     const searchParams = request.nextUrl.searchParams
     const podcastId = searchParams.get('podcastId')
     const status = searchParams.get('status')
 
-    let query = db.select().from(videoJobs)
-
-    // Filtrer par podcastId si fourni
+    // If podcastId is provided, verify it belongs to this org/user first
     if (podcastId) {
-      const conditions = [eq(videoJobs.podcastId, parseInt(podcastId))]
+      const podcastIdNum = parseInt(podcastId)
       
-      // Filtrer par status si fourni
+      // Verify podcast belongs to current org/user
+      let podcast
+      if (orgId) {
+        const [result] = await db
+          .select()
+          .from(podcasts)
+          .where(and(eq(podcasts.id, podcastIdNum), eq(podcasts.orgId, orgId)))
+          .limit(1)
+        podcast = result
+      } else {
+        const [result] = await db
+          .select()
+          .from(podcasts)
+          .where(and(eq(podcasts.id, podcastIdNum), eq(podcasts.userId, userId)))
+          .limit(1)
+        podcast = result
+      }
+      
+      if (!podcast) {
+        return NextResponse.json({ jobs: [], count: 0 })
+      }
+
+      const conditions = [eq(videoJobs.podcastId, podcastIdNum)]
       if (status) {
         conditions.push(eq(videoJobs.status, status))
       }
       
-      const jobs = await query.where(and(...conditions))
+      const jobs = await db.select().from(videoJobs).where(and(...conditions))
       return NextResponse.json({ jobs, count: jobs.length })
     }
 
-    // Tous les jobs, triés par date de création
-    const allJobs = await query.orderBy(videoJobs.createdAt)
+    // Get all podcasts for this org/user, then get their jobs
+    let orgPodcasts
+    if (orgId) {
+      orgPodcasts = await db.select({ id: podcasts.id }).from(podcasts).where(eq(podcasts.orgId, orgId))
+    } else {
+      orgPodcasts = await db.select({ id: podcasts.id }).from(podcasts).where(eq(podcasts.userId, userId))
+    }
+    
+    if (orgPodcasts.length === 0) {
+      return NextResponse.json({ jobs: [], count: 0 })
+    }
+    
+    const podcastIds = orgPodcasts.map(p => p.id)
+    const allJobs = await db
+      .select()
+      .from(videoJobs)
+      .where(inArray(videoJobs.podcastId, podcastIds))
+      .orderBy(videoJobs.createdAt)
     
     return NextResponse.json({ 
       jobs: allJobs,
@@ -53,6 +96,12 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    const { userId, orgId } = await auth()
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
+    }
+
     const body = await request.json()
     const { id, podcastId, audioChunkIndex, audioUrl, text, section, avatarImageUrl, status = 'queued' } = body
 
@@ -61,6 +110,30 @@ export async function POST(request: NextRequest) {
         { error: 'Paramètres manquants: id, audioChunkIndex, audioUrl requis' },
         { status: 400 }
       )
+    }
+
+    // Verify podcast belongs to this org/user if podcastId is provided
+    if (podcastId) {
+      let podcast
+      if (orgId) {
+        const [result] = await db
+          .select()
+          .from(podcasts)
+          .where(and(eq(podcasts.id, podcastId), eq(podcasts.orgId, orgId)))
+          .limit(1)
+        podcast = result
+      } else {
+        const [result] = await db
+          .select()
+          .from(podcasts)
+          .where(and(eq(podcasts.id, podcastId), eq(podcasts.userId, userId)))
+          .limit(1)
+        podcast = result
+      }
+      
+      if (!podcast) {
+        return NextResponse.json({ error: 'Podcast non trouvé' }, { status: 404 })
+      }
     }
 
     const [newJob] = await db
@@ -72,7 +145,7 @@ export async function POST(request: NextRequest) {
         audioUrl,
         text: text || null,
         section: section || null,
-        avatarImageUrl: avatarImageUrl || null, // Image variant for this segment
+        avatarImageUrl: avatarImageUrl || null,
         status,
       })
       .returning()
@@ -94,20 +167,49 @@ export async function POST(request: NextRequest) {
 
 /**
  * DELETE /api/video-jobs
- * Supprime tous les jobs (ou filtrés par podcast)
+ * Supprime les jobs d'un podcast (vérifie l'ownership)
  */
 export async function DELETE(request: NextRequest) {
   try {
+    const { userId, orgId } = await auth()
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
+    }
+
     const searchParams = request.nextUrl.searchParams
     const podcastId = searchParams.get('podcastId')
 
-    if (podcastId) {
-      await db.delete(videoJobs).where(eq(videoJobs.podcastId, parseInt(podcastId)))
-      console.log(`🗑️ Deleted all jobs for podcast ${podcastId}`)
-    } else {
-      await db.delete(videoJobs)
-      console.log('🗑️ Deleted all video jobs')
+    if (!podcastId) {
+      return NextResponse.json({ error: 'podcastId requis' }, { status: 400 })
     }
+
+    const podcastIdNum = parseInt(podcastId)
+    
+    // Verify podcast belongs to this org/user
+    let podcast
+    if (orgId) {
+      const [result] = await db
+        .select()
+        .from(podcasts)
+        .where(and(eq(podcasts.id, podcastIdNum), eq(podcasts.orgId, orgId)))
+        .limit(1)
+      podcast = result
+    } else {
+      const [result] = await db
+        .select()
+        .from(podcasts)
+        .where(and(eq(podcasts.id, podcastIdNum), eq(podcasts.userId, userId)))
+        .limit(1)
+      podcast = result
+    }
+    
+    if (!podcast) {
+      return NextResponse.json({ error: 'Podcast non trouvé' }, { status: 404 })
+    }
+
+    await db.delete(videoJobs).where(eq(videoJobs.podcastId, podcastIdNum))
+    console.log(`🗑️ Deleted all jobs for podcast ${podcastId}`)
 
     return NextResponse.json({ success: true })
   } catch (error) {

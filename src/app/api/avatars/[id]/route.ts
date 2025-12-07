@@ -1,20 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { db, avatars } from '@/lib/db'
-import { eq } from 'drizzle-orm'
+import { eq, and } from 'drizzle-orm'
 
 export const dynamic = 'force-dynamic'
 
 /**
  * GET /api/avatars/[id]
- * Get a single avatar by ID
+ * Get a single avatar by ID (filtered by org)
  */
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const { userId } = await auth()
+    const { userId, orgId } = await auth()
     
     if (!userId) {
       return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
@@ -36,9 +36,17 @@ export async function GET(
       return NextResponse.json({ error: 'Avatar not found' }, { status: 404 })
     }
 
-    // Allow access if: default avatar, user's avatar, or legacy avatar without userId
-    if (!avatar.isDefault && avatar.userId && avatar.userId !== userId) {
-      return NextResponse.json({ error: 'Non autorisé' }, { status: 403 })
+    // Check ownership based on org
+    if (orgId) {
+      // Org mode: avatar must belong to this org
+      if (avatar.orgId && avatar.orgId !== orgId) {
+        return NextResponse.json({ error: 'Non autorisé' }, { status: 403 })
+      }
+    } else {
+      // Personal mode: avatar must belong to this user
+      if (avatar.userId && avatar.userId !== userId) {
+        return NextResponse.json({ error: 'Non autorisé' }, { status: 403 })
+      }
     }
     
     return NextResponse.json({ avatar })
@@ -53,14 +61,14 @@ export async function GET(
 
 /**
  * PUT /api/avatars/[id]
- * Update an avatar (only owner can update, cannot update default)
+ * Update an avatar (only owner/org can update)
  */
 export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const { userId } = await auth()
+    const { userId, orgId } = await auth()
     
     if (!userId) {
       return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
@@ -86,14 +94,15 @@ export async function PUT(
       return NextResponse.json({ error: 'Avatar not found' }, { status: 404 })
     }
 
-    // Cannot update default avatar
-    if (existing.isDefault) {
-      return NextResponse.json({ error: 'Cannot update default avatar' }, { status: 403 })
-    }
-
-    // Check ownership (allow if user owns it or legacy avatar without userId)
-    if (existing.userId && existing.userId !== userId) {
-      return NextResponse.json({ error: 'Non autorisé' }, { status: 403 })
+    // Check ownership based on org
+    if (orgId) {
+      if (existing.orgId && existing.orgId !== orgId) {
+        return NextResponse.json({ error: 'Non autorisé' }, { status: 403 })
+      }
+    } else {
+      if (existing.userId && existing.userId !== userId) {
+        return NextResponse.json({ error: 'Non autorisé' }, { status: 403 })
+      }
     }
     
     // Build update object with only provided fields
@@ -101,9 +110,12 @@ export async function PUT(
       updatedAt: new Date(),
     }
 
-    // Claim legacy avatar for current user
+    // Claim avatar for current user/org if not set
     if (!existing.userId) {
       updateData.userId = userId
+    }
+    if (orgId && !existing.orgId) {
+      updateData.orgId = orgId
     }
     
     if (name !== undefined) updateData.name = name
@@ -131,14 +143,14 @@ export async function PUT(
 
 /**
  * DELETE /api/avatars/[id]
- * Delete an avatar (cannot delete default, only owner can delete)
+ * Delete an avatar (only owner/org can delete)
  */
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const { userId } = await auth()
+    const { userId, orgId } = await auth()
     
     if (!userId) {
       return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
@@ -150,7 +162,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Invalid avatar ID' }, { status: 400 })
     }
     
-    // Check if avatar exists and is not default
+    // Check if avatar exists
     const [existing] = await db
       .select()
       .from(avatars)
@@ -160,22 +172,21 @@ export async function DELETE(
     if (!existing) {
       return NextResponse.json({ error: 'Avatar not found' }, { status: 404 })
     }
-    
-    if (existing.isDefault) {
-      return NextResponse.json(
-        { error: 'Cannot delete the default avatar' },
-        { status: 400 }
-      )
-    }
 
-    // Check ownership (allow if user owns it or legacy avatar without userId)
-    if (existing.userId && existing.userId !== userId) {
-      return NextResponse.json({ error: 'Non autorisé' }, { status: 403 })
+    // Check ownership based on org
+    if (orgId) {
+      if (existing.orgId && existing.orgId !== orgId) {
+        return NextResponse.json({ error: 'Non autorisé' }, { status: 403 })
+      }
+    } else {
+      if (existing.userId && existing.userId !== userId) {
+        return NextResponse.json({ error: 'Non autorisé' }, { status: 403 })
+      }
     }
     
     await db.delete(avatars).where(eq(avatars.id, id))
     
-    console.log(`🗑️ Deleted avatar: ${existing.name} by user: ${userId}`)
+    console.log(`🗑️ Deleted avatar: ${existing.name} by user: ${userId} org: ${orgId}`)
     
     return NextResponse.json({ success: true, message: `Avatar "${existing.name}" deleted` })
   } catch (error) {

@@ -1,27 +1,75 @@
 import { NextRequest, NextResponse } from 'next/server'
 export const dynamic = 'force-dynamic'
-import { db, audioJobs } from '@/lib/db'
-import { eq } from 'drizzle-orm'
+import { auth } from '@clerk/nextjs/server'
+import { db, audioJobs, podcasts } from '@/lib/db'
+import { eq, and, inArray } from 'drizzle-orm'
 
 /**
  * GET /api/audio-jobs
- * Récupère les jobs audio (filtrés par podcast si fourni)
+ * Récupère les jobs audio filtrés par organisation
  */
 export async function GET(request: NextRequest) {
   try {
+    const { userId, orgId } = await auth()
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
+    }
+
     const searchParams = request.nextUrl.searchParams
     const podcastId = searchParams.get('podcastId')
 
     if (podcastId) {
+      const podcastIdNum = parseInt(podcastId)
+      
+      // Verify podcast belongs to current org/user
+      let podcast
+      if (orgId) {
+        const [result] = await db
+          .select()
+          .from(podcasts)
+          .where(and(eq(podcasts.id, podcastIdNum), eq(podcasts.orgId, orgId)))
+          .limit(1)
+        podcast = result
+      } else {
+        const [result] = await db
+          .select()
+          .from(podcasts)
+          .where(and(eq(podcasts.id, podcastIdNum), eq(podcasts.userId, userId)))
+          .limit(1)
+        podcast = result
+      }
+      
+      if (!podcast) {
+        return NextResponse.json({ jobs: [], count: 0 })
+      }
+
       const jobs = await db
         .select()
         .from(audioJobs)
-        .where(eq(audioJobs.podcastId, parseInt(podcastId)))
+        .where(eq(audioJobs.podcastId, podcastIdNum))
 
       return NextResponse.json({ jobs, count: jobs.length })
     }
 
-    const allJobs = await db.select().from(audioJobs).orderBy(audioJobs.createdAt)
+    // Get all podcasts for this org/user, then get their jobs
+    let orgPodcasts
+    if (orgId) {
+      orgPodcasts = await db.select({ id: podcasts.id }).from(podcasts).where(eq(podcasts.orgId, orgId))
+    } else {
+      orgPodcasts = await db.select({ id: podcasts.id }).from(podcasts).where(eq(podcasts.userId, userId))
+    }
+    
+    if (orgPodcasts.length === 0) {
+      return NextResponse.json({ jobs: [], count: 0 })
+    }
+    
+    const podcastIds = orgPodcasts.map(p => p.id)
+    const allJobs = await db
+      .select()
+      .from(audioJobs)
+      .where(inArray(audioJobs.podcastId, podcastIds))
+      .orderBy(audioJobs.createdAt)
     
     return NextResponse.json({ 
       jobs: allJobs,
@@ -45,6 +93,12 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    const { userId, orgId } = await auth()
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
+    }
+
     const body = await request.json()
     const { id, podcastId, scriptChunks, voiceUrl, voiceId, status = 'queued' } = body
 
@@ -57,13 +111,37 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Verify podcast belongs to this org/user if podcastId is provided
+    if (podcastId) {
+      let podcast
+      if (orgId) {
+        const [result] = await db
+          .select()
+          .from(podcasts)
+          .where(and(eq(podcasts.id, podcastId), eq(podcasts.orgId, orgId)))
+          .limit(1)
+        podcast = result
+      } else {
+        const [result] = await db
+          .select()
+          .from(podcasts)
+          .where(and(eq(podcasts.id, podcastId), eq(podcasts.userId, userId)))
+          .limit(1)
+        podcast = result
+      }
+      
+      if (!podcast) {
+        return NextResponse.json({ error: 'Podcast non trouvé' }, { status: 404 })
+      }
+    }
+
     const [newJob] = await db
       .insert(audioJobs)
       .values({
         id,
         podcastId: podcastId || null,
         scriptChunks: scriptChunks || null,
-        voiceId: voice, // Store the voice URL in voiceId field
+        voiceId: voice,
         status,
       })
       .returning()

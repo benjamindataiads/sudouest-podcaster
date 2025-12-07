@@ -77,23 +77,25 @@ function DateSlider({
     <div className="mb-8">
       {/* Date Title */}
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-base font-medium text-gray-700 capitalize flex items-center gap-3">
-          <span className="w-1 h-5 bg-purple-500 rounded-full"></span>
+        <h3 className="text-base font-medium capitalize flex items-center gap-3" style={{ color: 'var(--brand-text)' }}>
+          <span className="w-1 h-5 rounded-full" style={{ backgroundColor: 'var(--brand-accent)' }}></span>
           {date}
-          <span className="text-sm font-normal text-gray-400">({podcasts.length})</span>
+          <span className="text-sm font-normal" style={{ color: 'var(--brand-text)', opacity: 0.5 }}>({podcasts.length})</span>
         </h3>
         <div className="flex gap-2">
           <button
             onClick={() => scroll('left')}
-            className="p-2 rounded-full bg-white shadow-sm hover:bg-gray-50 transition-colors border border-gray-200"
+            className="p-2 rounded-full shadow-sm hover:opacity-80 transition-colors"
+            style={{ backgroundColor: 'var(--brand-primary)', border: '1px solid var(--brand-secondary)' }}
           >
-            <ChevronLeft className="w-4 h-4 text-gray-500" />
+            <ChevronLeft className="w-4 h-4" style={{ color: 'var(--brand-text)', opacity: 0.6 }} />
           </button>
           <button
             onClick={() => scroll('right')}
-            className="p-2 rounded-full bg-white shadow-sm hover:bg-gray-50 transition-colors border border-gray-200"
+            className="p-2 rounded-full shadow-sm hover:opacity-80 transition-colors"
+            style={{ backgroundColor: 'var(--brand-primary)', border: '1px solid var(--brand-secondary)' }}
           >
-            <ChevronRight className="w-4 h-4 text-gray-500" />
+            <ChevronRight className="w-4 h-4" style={{ color: 'var(--brand-text)', opacity: 0.6 }} />
           </button>
         </div>
       </div>
@@ -140,9 +142,9 @@ function PodcastCard({
   getStepNumber: (status: string) => number
 }) {
   return (
-    <Card className="flex-shrink-0 w-72 overflow-hidden hover:shadow-lg transition-all duration-300 group border border-gray-200 hover:border-purple-300">
+    <Card className="flex-shrink-0 w-72 overflow-hidden hover:shadow-lg transition-all duration-300 group">
       {/* Video/Thumbnail Preview */}
-      <div className="relative h-40 bg-gradient-to-br from-gray-50 to-gray-100 overflow-hidden">
+      <div className="relative h-40 overflow-hidden" style={{ backgroundColor: 'var(--brand-secondary)' }}>
         {podcast.finalVideoUrl ? (
           <video
             src={podcast.finalVideoUrl}
@@ -158,17 +160,21 @@ function PodcastCard({
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
-            <div className={`w-16 h-16 rounded-full flex items-center justify-center ${
-              podcast.status === 'completed' ? 'bg-green-100' :
-              podcast.status.includes('generating') ? 'bg-yellow-100 animate-pulse' :
-              'bg-white border border-gray-200'
-            }`}>
+            <div 
+              className={`w-16 h-16 rounded-full flex items-center justify-center ${
+                podcast.status.includes('generating') ? 'animate-pulse' : ''
+              }`}
+              style={{ 
+                backgroundColor: podcast.status === 'completed' ? '#dcfce7' : 'var(--brand-primary)',
+                border: podcast.status === 'completed' ? 'none' : '1px solid var(--brand-secondary)'
+              }}
+            >
               {podcast.videoUrls?.length ? (
-                <Film className="h-8 w-8 text-gray-500" />
+                <Film className="h-8 w-8" style={{ color: 'var(--brand-text)', opacity: 0.5 }} />
               ) : podcast.audioChunks?.length ? (
-                <Play className="h-8 w-8 text-gray-500" />
+                <Play className="h-8 w-8" style={{ color: 'var(--brand-text)', opacity: 0.5 }} />
               ) : (
-                <Edit2 className="h-8 w-8 text-gray-400" />
+                <Edit2 className="h-8 w-8" style={{ color: 'var(--brand-text)', opacity: 0.4 }} />
               )}
             </div>
           </div>
@@ -182,17 +188,20 @@ function PodcastCard({
         </div>
         
         {/* Progress Dots */}
-        <div className="absolute bottom-3 left-3 flex items-center gap-1 bg-white/90 backdrop-blur-sm rounded-full px-2 py-1 border border-gray-100">
+        <div className="absolute bottom-3 left-3 flex items-center gap-1 backdrop-blur-sm rounded-full px-2 py-1" style={{ backgroundColor: 'rgba(255,255,255,0.9)', border: '1px solid var(--brand-secondary)' }}>
           {[1, 2, 3, 4].map((step) => (
             <div
               key={step}
               className={`w-2 h-2 rounded-full ${
-                step <= getStepNumber(podcast.status)
-                  ? podcast.status.includes('generating') && step === getStepNumber(podcast.status)
-                    ? 'bg-yellow-500 animate-pulse'
-                    : 'bg-purple-500'
-                  : 'bg-gray-200'
+                podcast.status.includes('generating') && step === getStepNumber(podcast.status)
+                  ? 'bg-yellow-500 animate-pulse'
+                  : ''
               }`}
+              style={{
+                backgroundColor: step <= getStepNumber(podcast.status)
+                  ? (podcast.status.includes('generating') && step === getStepNumber(podcast.status) ? undefined : 'var(--brand-accent)')
+                  : 'var(--brand-secondary)'
+              }}
             />
           ))}
         </div>
@@ -200,11 +209,11 @@ function PodcastCard({
       
       {/* Card Content */}
       <CardContent className="p-4">
-        <h4 className="font-semibold text-gray-900 mb-2 line-clamp-2 min-h-[2.5rem]">
+        <h4 className="font-semibold mb-2 line-clamp-2 min-h-[2.5rem]" style={{ color: 'var(--brand-text)' }}>
           {podcast.title}
         </h4>
         
-        <div className="flex items-center gap-3 text-sm text-gray-500 mb-4">
+        <div className="flex items-center gap-3 text-sm mb-4" style={{ color: 'var(--brand-text)', opacity: 0.6 }}>
           {podcast.estimatedDuration && (
             <span className="flex items-center gap-1">
               <Clock className="h-3.5 w-3.5" />
@@ -212,7 +221,7 @@ function PodcastCard({
             </span>
           )}
           {podcast.finalVideoUrl && (
-            <span className="flex items-center gap-1 text-purple-600">
+            <span className="flex items-center gap-1" style={{ color: 'var(--brand-accent)' }}>
               <Film className="h-3.5 w-3.5" />
               Vidéo
             </span>
@@ -222,13 +231,13 @@ function PodcastCard({
         {/* Actions */}
         <div className="flex items-center gap-2">
           <Link href={`/create?resume=${podcast.id}&step=${getStepNumber(podcast.status)}`} className="flex-1">
-            <Button size="sm" className="w-full bg-gray-900 hover:bg-gray-800 text-white">
+            <Button size="sm" className="w-full">
               {podcast.status === 'completed' ? 'Voir' : 'Reprendre'}
             </Button>
           </Link>
           {(podcast.audioChunks || podcast.videoUrls) && (
             <Link href={`/gallery?podcastId=${podcast.id}`}>
-              <Button size="sm" variant="outline" className="px-3 border-gray-200">
+              <Button size="sm" variant="outline" className="px-3">
                 <Film className="h-4 w-4" />
               </Button>
             </Link>
@@ -381,7 +390,7 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--brand-secondary)' }}>
       {/* Sidebar */}
       <Sidebar />
 
@@ -390,24 +399,24 @@ export default function HomePage() {
         <div className="p-6 lg:p-8">
           {/* Page Header */}
           <div className="mb-8">
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Mes podcasts</h1>
-            <p className="text-gray-500">Créez et gérez vos podcasts audio et vidéo</p>
+            <h1 className="text-2xl font-bold mb-2" style={{ color: 'var(--brand-text)' }}>Mes podcasts</h1>
+            <p style={{ color: 'var(--brand-text)', opacity: 0.6 }}>Créez et gérez vos podcasts audio et vidéo</p>
           </div>
 
           {/* Create CTA */}
-          <div className="mb-8 p-6 bg-white rounded-xl border border-gray-200 shadow-sm">
+          <div className="mb-8 p-6 rounded-xl shadow-sm" style={{ backgroundColor: 'var(--brand-primary)', border: '1px solid var(--brand-secondary)' }}>
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
-                  <Mic className="h-6 w-6 text-purple-600" />
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: 'var(--brand-accent)', opacity: 0.15 }}>
+                  <Mic className="h-6 w-6" style={{ color: 'var(--brand-accent)' }} />
                 </div>
                 <div>
-                  <h2 className="font-semibold text-gray-900">Créer un nouveau podcast</h2>
-                  <p className="text-sm text-gray-500">Transformez l'actualité en contenu audio/vidéo</p>
+                  <h2 className="font-semibold" style={{ color: 'var(--brand-text)' }}>Créer un nouveau podcast</h2>
+                  <p className="text-sm" style={{ color: 'var(--brand-text)', opacity: 0.6 }}>Transformez l'actualité en contenu audio/vidéo</p>
                 </div>
               </div>
               <CreatePodcastDialog>
-                <Button className="bg-gray-900 hover:bg-gray-800 text-white">
+                <Button>
                   <Plus className="h-4 w-4 mr-2" />
                   Nouveau podcast
                 </Button>
@@ -434,18 +443,18 @@ export default function HomePage() {
               getStepNumber={getStepNumber}
             />
           ) : (
-            <div className="text-center py-16 bg-white rounded-xl border border-gray-200">
-              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Film className="h-8 w-8 text-gray-400" />
+            <div className="text-center py-16 rounded-xl" style={{ backgroundColor: 'var(--brand-primary)', border: '1px solid var(--brand-secondary)' }}>
+              <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: 'var(--brand-secondary)' }}>
+                <Film className="h-8 w-8" style={{ color: 'var(--brand-text)', opacity: 0.4 }} />
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              <h3 className="text-lg font-semibold mb-2" style={{ color: 'var(--brand-text)' }}>
                 Aucun podcast créé
               </h3>
-              <p className="text-gray-500 mb-6">
+              <p className="mb-6" style={{ color: 'var(--brand-text)', opacity: 0.6 }}>
                 Créez votre premier podcast en quelques clics
               </p>
               <CreatePodcastDialog>
-                <Button className="bg-gray-900 hover:bg-gray-800 text-white">
+                <Button>
                   <Plus className="h-4 w-4 mr-2" />
                   Créer mon premier podcast
                 </Button>
@@ -457,52 +466,53 @@ export default function HomePage() {
           <div className="mt-8">
             <button
               onClick={() => setShowHowItWorks(!showHowItWorks)}
-              className="w-full flex items-center justify-between p-4 bg-white hover:bg-gray-50 rounded-xl transition-colors border border-gray-200"
+              className="w-full flex items-center justify-between p-4 rounded-xl transition-colors hover:opacity-90"
+              style={{ backgroundColor: 'var(--brand-primary)', border: '1px solid var(--brand-secondary)' }}
             >
-              <h3 className="font-semibold text-gray-900 flex items-center">
-                <span className="w-1 h-5 bg-purple-500 mr-3 rounded-full"></span>
+              <h3 className="font-semibold flex items-center" style={{ color: 'var(--brand-text)' }}>
+                <span className="w-1 h-5 mr-3 rounded-full" style={{ backgroundColor: 'var(--brand-accent)' }}></span>
                 Comment ça marche ?
               </h3>
               {showHowItWorks ? (
-                <ChevronUp className="h-5 w-5 text-gray-400" />
+                <ChevronUp className="h-5 w-5" style={{ color: 'var(--brand-text)', opacity: 0.5 }} />
               ) : (
-                <ChevronDown className="h-5 w-5 text-gray-400" />
+                <ChevronDown className="h-5 w-5" style={{ color: 'var(--brand-text)', opacity: 0.5 }} />
               )}
             </button>
 
             {showHowItWorks && (
               <div className="grid md:grid-cols-3 gap-4 mt-4 animate-in fade-in duration-300">
-                <Card className="border border-gray-200 hover:border-purple-300 transition-all">
+                <Card className="transition-all hover:shadow-md">
                   <CardContent className="p-6 text-center">
-                    <div className="w-14 h-14 bg-purple-100 rounded-xl flex items-center justify-center mx-auto mb-4">
+                    <div className="w-14 h-14 rounded-xl flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: 'var(--brand-accent)', opacity: 0.15 }}>
                       <span className="text-2xl">📰</span>
                     </div>
-                    <h3 className="font-semibold mb-2">Sélection IA</h3>
-                    <p className="text-gray-500 text-sm">
+                    <h3 className="font-semibold mb-2" style={{ color: 'var(--brand-text)' }}>Sélection IA</h3>
+                    <p className="text-sm" style={{ color: 'var(--brand-text)', opacity: 0.6 }}>
                       L'IA sélectionne les meilleurs articles
                     </p>
                   </CardContent>
                 </Card>
 
-                <Card className="border border-gray-200 hover:border-purple-300 transition-all">
+                <Card className="transition-all hover:shadow-md">
                   <CardContent className="p-6 text-center">
-                    <div className="w-14 h-14 bg-purple-100 rounded-xl flex items-center justify-center mx-auto mb-4">
+                    <div className="w-14 h-14 rounded-xl flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: 'var(--brand-accent)', opacity: 0.15 }}>
                       <span className="text-2xl">✍️</span>
                     </div>
-                    <h3 className="font-semibold mb-2">Script éditable</h3>
-                    <p className="text-gray-500 text-sm">
+                    <h3 className="font-semibold mb-2" style={{ color: 'var(--brand-text)' }}>Script éditable</h3>
+                    <p className="text-sm" style={{ color: 'var(--brand-text)', opacity: 0.6 }}>
                       Personnalisez votre script de podcast
                     </p>
                   </CardContent>
                 </Card>
 
-                <Card className="border border-gray-200 hover:border-purple-300 transition-all">
+                <Card className="transition-all hover:shadow-md">
                   <CardContent className="p-6 text-center">
-                    <div className="w-14 h-14 bg-purple-100 rounded-xl flex items-center justify-center mx-auto mb-4">
+                    <div className="w-14 h-14 rounded-xl flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: 'var(--brand-accent)', opacity: 0.15 }}>
                       <span className="text-2xl">🎥</span>
                     </div>
-                    <h3 className="font-semibold mb-2">Audio & Vidéo</h3>
-                    <p className="text-gray-500 text-sm">
+                    <h3 className="font-semibold mb-2" style={{ color: 'var(--brand-text)' }}>Audio & Vidéo</h3>
+                    <p className="text-sm" style={{ color: 'var(--brand-text)', opacity: 0.6 }}>
                       Production avec voix clonée et avatar
                     </p>
                   </CardContent>
@@ -512,8 +522,8 @@ export default function HomePage() {
           </div>
 
           {/* Footer */}
-          <footer className="mt-12 pt-6 border-t border-gray-200">
-            <div className="flex items-center justify-between text-sm text-gray-400">
+          <footer className="mt-12 pt-6" style={{ borderTop: '1px solid var(--brand-secondary)' }}>
+            <div className="flex items-center justify-between text-sm" style={{ color: 'var(--brand-text)', opacity: 0.4 }}>
               <span>Podcaster © 2025</span>
               <span>POC Propulsé par l'IA et Carole Fourcade</span>
             </div>

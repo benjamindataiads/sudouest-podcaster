@@ -52,7 +52,7 @@ function NavSection({
   
   return (
     <div className="mb-6">
-      <h3 className="px-3 mb-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+      <h3 className="px-3 mb-2 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--brand-text)', opacity: 0.5 }}>
         {title}
       </h3>
       <nav className="space-y-1">
@@ -62,11 +62,12 @@ function NavSection({
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
-                isActive
-                  ? 'bg-gray-100 text-gray-900 font-medium'
-                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-              }`}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all`}
+              style={{
+                backgroundColor: isActive ? 'var(--brand-secondary)' : 'transparent',
+                color: 'var(--brand-text)',
+                fontWeight: isActive ? 500 : 400,
+              }}
             >
               {item.icon}
               <span>{item.label}</span>
@@ -102,9 +103,9 @@ export default function Sidebar() {
   const isAdmin = orgRole === 'org:admin'
 
   const sidebarContent = (
-    <div className="flex flex-col h-full bg-white border-r border-gray-200">
+    <div className="flex flex-col h-full" style={{ backgroundColor: 'var(--brand-primary)', borderRight: '1px solid var(--brand-secondary)' }}>
       {/* Header with Logo + Org Switcher */}
-      <div className="border-b border-gray-200">
+      <div style={{ borderBottom: '1px solid var(--brand-secondary)' }}>
         <SignedIn>
           {/* Organization Switcher - allows creating orgs */}
           <OrganizationSwitcher 
@@ -115,10 +116,10 @@ export default function Sidebar() {
             appearance={{
               elements: {
                 rootBox: "w-full",
-                organizationSwitcherTrigger: "w-full flex items-center gap-3 p-4 hover:bg-gray-50 transition-colors cursor-pointer border-0 rounded-none",
-                organizationPreviewMainIdentifier: "font-bold text-gray-900",
-                organizationPreviewSecondaryIdentifier: "text-xs text-gray-500",
-                organizationSwitcherTriggerIcon: "text-gray-400 ml-auto",
+                organizationSwitcherTrigger: "w-full flex items-center gap-3 p-4 hover:opacity-80 transition-all cursor-pointer border-0 rounded-none",
+                organizationPreviewMainIdentifier: "font-bold",
+                organizationPreviewSecondaryIdentifier: "text-xs opacity-60",
+                organizationSwitcherTriggerIcon: "opacity-50 ml-auto",
               }
             }}
           />
@@ -127,8 +128,8 @@ export default function Sidebar() {
           <div className="flex items-center gap-3 p-4">
             <OrgLogo />
             <div className="flex-1 min-w-0">
-              <h1 className="font-bold text-gray-900 truncate">Podcaster</h1>
-              <p className="text-xs text-gray-500">Créateur de podcasts IA</p>
+              <h1 className="font-bold truncate" style={{ color: 'var(--brand-text)' }}>Podcaster</h1>
+              <p className="text-xs" style={{ color: 'var(--brand-text)', opacity: 0.6 }}>Créateur de podcasts IA</p>
             </div>
           </div>
         </SignedOut>
@@ -141,16 +142,17 @@ export default function Sidebar() {
       </div>
 
       {/* Bottom section: Settings & User */}
-      <div className="p-3 border-t border-gray-200 space-y-2">
+      <div className="p-3 space-y-2" style={{ borderTop: '1px solid var(--brand-secondary)' }}>
         {/* Settings - visible to all, page handles access control */}
         <Link
           href="/settings"
-          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-all"
+          className="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all hover:opacity-80"
+          style={{ color: 'var(--brand-text)' }}
         >
           <Settings className="h-5 w-5" />
           <span>Paramètres</span>
           {isAdmin && (
-            <span className="ml-auto text-xs bg-purple-100 text-purple-600 px-2 py-0.5 rounded">Admin</span>
+            <span className="ml-auto text-xs px-2 py-0.5 rounded" style={{ backgroundColor: 'var(--brand-accent)', color: 'white' }}>Admin</span>
           )}
         </Link>
 
@@ -165,8 +167,8 @@ export default function Sidebar() {
               }}
             />
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 truncate">Mon compte</p>
-              <p className="text-xs text-gray-500">Gérer le profil</p>
+              <p className="text-sm font-medium truncate" style={{ color: 'var(--brand-text)' }}>Mon compte</p>
+              <p className="text-xs" style={{ color: 'var(--brand-text)', opacity: 0.6 }}>Gérer le profil</p>
             </div>
           </div>
         </SignedIn>
@@ -187,9 +189,10 @@ export default function Sidebar() {
       {/* Mobile menu button */}
       <button
         onClick={() => setMobileOpen(true)}
-        className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-white rounded-lg shadow-md border border-gray-200"
+        className="lg:hidden fixed top-4 left-4 z-50 p-2 rounded-lg shadow-md"
+        style={{ backgroundColor: 'var(--brand-primary)', border: '1px solid var(--brand-secondary)' }}
       >
-        <Menu className="h-6 w-6 text-gray-600" />
+        <Menu className="h-6 w-6" style={{ color: 'var(--brand-text)' }} />
       </button>
 
       {/* Mobile sidebar overlay */}

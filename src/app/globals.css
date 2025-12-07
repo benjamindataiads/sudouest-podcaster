@@ -4,6 +4,14 @@
 
 @layer base {
   :root {
+    /* Brand colors - updated dynamically by BrandingContext */
+    --brand-primary: #ffffff;
+    --brand-secondary: #e5e7eb;
+    --brand-accent: #8B5CF6;
+    --brand-text: #111827;
+    --brand-font: Inter, system-ui, sans-serif;
+
+    /* Shadcn/ui variables */
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
     --card: 0 0% 100%;
@@ -55,6 +63,42 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: var(--brand-font);
+    color: var(--brand-text);
+  }
+}
+
+/* Brand utility classes */
+@layer utilities {
+  .bg-brand-primary {
+    background-color: var(--brand-primary);
+  }
+  .bg-brand-secondary {
+    background-color: var(--brand-secondary);
+  }
+  .bg-brand-accent {
+    background-color: var(--brand-accent);
+  }
+  .text-brand {
+    color: var(--brand-text);
+  }
+  .text-brand-accent {
+    color: var(--brand-accent);
+  }
+  .border-brand {
+    border-color: var(--brand-secondary);
+  }
+  .ring-brand {
+    --tw-ring-color: var(--brand-accent);
+  }
+  
+  /* Brand button */
+  .btn-brand {
+    background-color: var(--brand-accent);
+    color: white;
+  }
+  .btn-brand:hover {
+    opacity: 0.9;
   }
 }
 

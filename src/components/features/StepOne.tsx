@@ -12,23 +12,70 @@ interface StepOneProps {
   onSkipToCustomScript?: () => void
 }
 
-const RSS_FEEDS = [
-  { value: 'bordeaux', label: 'Bordeaux - Actualités générales', url: 'https://www.sudouest.fr/gironde/bordeaux/rss.xml' },
-  { value: 'faits-divers', label: 'Faits divers', url: 'https://www.sudouest.fr/faits-divers/rss.xml' },
-  { value: 'rugby', label: 'Rugby - Bordeaux-Bègles', url: 'https://www.sudouest.fr/sport/rugby/bordeaux-begles/rss.xml' },
-]
+interface RssFeed {
+  id: number
+  url: string
+  name: string | null
+  isActive: boolean
+}
+
+// Default feed if none configured
+const DEFAULT_FEED: RssFeed = {
+  id: 0,
+  url: 'https://flipboard.com/topic/fr-afp.rss',
+  name: 'AFP - Actualités',
+  isActive: true,
+}
 
 export default function StepOne({ onComplete, onSkipToCustomScript }: StepOneProps) {
   const [articles, setArticles] = useState<ArticleWithScore[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingFeeds, setLoadingFeeds] = useState(true)
   const [analyzing, setAnalyzing] = useState(false)
   const [analyzed, setAnalyzed] = useState(false)
   const [error, setError] = useState<string>('')
-  const [selectedFeed, setSelectedFeed] = useState<string>('bordeaux')
+  const [rssFeeds, setRssFeeds] = useState<RssFeed[]>([])
+  const [selectedFeedId, setSelectedFeedId] = useState<number | null>(null)
 
+  // Load RSS feeds from organization settings
   useEffect(() => {
-    fetchArticles()
-  }, [selectedFeed])
+    const loadFeeds = async () => {
+      try {
+        setLoadingFeeds(true)
+        const response = await fetch('/api/organizations/rss-feeds')
+        if (response.ok) {
+          const data = await response.json()
+          const activeFeeds = (data.feeds || []).filter((f: RssFeed) => f.isActive)
+          if (activeFeeds.length > 0) {
+            setRssFeeds(activeFeeds)
+            setSelectedFeedId(activeFeeds[0].id)
+          } else {
+            // No feeds configured, use default
+            setRssFeeds([DEFAULT_FEED])
+            setSelectedFeedId(DEFAULT_FEED.id)
+          }
+        } else {
+          // API error, use default
+          setRssFeeds([DEFAULT_FEED])
+          setSelectedFeedId(DEFAULT_FEED.id)
+        }
+      } catch (err) {
+        console.error('Error loading RSS feeds:', err)
+        setRssFeeds([DEFAULT_FEED])
+        setSelectedFeedId(DEFAULT_FEED.id)
+      } finally {
+        setLoadingFeeds(false)
+      }
+    }
+    loadFeeds()
+  }, [])
+
+  // Fetch articles when feed changes
+  useEffect(() => {
+    if (selectedFeedId !== null && !loadingFeeds) {
+      fetchArticles()
+    }
+  }, [selectedFeedId, loadingFeeds])
 
   const fetchArticles = async () => {
     try {
@@ -36,8 +83,10 @@ export default function StepOne({ onComplete, onSkipToCustomScript }: StepOnePro
       setError('')
       setAnalyzed(false)
       
-      const feed = RSS_FEEDS.find(f => f.value === selectedFeed)
-      const response = await fetch(`/api/articles?feedUrl=${encodeURIComponent(feed?.url || RSS_FEEDS[0].url)}`)
+      const feed = rssFeeds.find(f => f.id === selectedFeedId) || rssFeeds[0]
+      if (!feed) return
+      
+      const response = await fetch(`/api/articles?feedUrl=${encodeURIComponent(feed.url)}`)
       
       if (!response.ok) {
         throw new Error('Erreur lors de la récupération des articles')
@@ -164,25 +213,27 @@ export default function StepOne({ onComplete, onSkipToCustomScript }: StepOnePro
         </CardHeader>
         <CardContent>
           {/* Sélecteur de flux RSS */}
-          <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-            <label htmlFor="feed-select" className="block text-sm font-medium text-gray-700 mb-2">
+          <div className="mb-6 p-4 bg-brand-secondary rounded-lg border border-brand">
+            <label htmlFor="feed-select" className="block text-sm font-medium text-brand mb-2">
               Source des articles
             </label>
             <select
               id="feed-select"
-              value={selectedFeed}
-              onChange={(e) => setSelectedFeed(e.target.value)}
-              disabled={loading || analyzing}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+              value={selectedFeedId ?? ''}
+              onChange={(e) => setSelectedFeedId(Number(e.target.value))}
+              disabled={loading || analyzing || loadingFeeds}
+              className="w-full px-4 py-2 border border-brand rounded-lg focus:ring-2 ring-brand focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed bg-brand-primary text-brand"
             >
-              {RSS_FEEDS.map((feed) => (
-                <option key={feed.value} value={feed.value}>
-                  {feed.label}
+              {rssFeeds.map((feed) => (
+                <option key={feed.id} value={feed.id}>
+                  {feed.name || feed.url}
                 </option>
               ))}
             </select>
-            <p className="text-xs text-gray-500 mt-2">
-              Changez de source pour voir différents articles. Les articles seront rechargés automatiquement.
+            <p className="text-xs text-brand opacity-70 mt-2">
+              {rssFeeds.length <= 1 && rssFeeds[0]?.id === 0
+                ? "Aucune source configurée. Configurez vos sources RSS dans les paramètres de l'organisation."
+                : "Changez de source pour voir différents articles. Les articles seront rechargés automatiquement."}
             </p>
           </div>
 

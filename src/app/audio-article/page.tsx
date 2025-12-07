@@ -25,7 +25,9 @@ import {
   Clock,
   ArrowLeft,
   Mic,
-  Trash2
+  Trash2,
+  Link,
+  Globe
 } from 'lucide-react'
 
 type Step = 1 | 2 | 3 | 4
@@ -104,6 +106,8 @@ export default function AudioArticlePage() {
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false)
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [isScraping, setIsScraping] = useState(false)
+  const [articleUrl, setArticleUrl] = useState('')
   const [playingId, setPlayingId] = useState<number | null>(null)
   const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null)
 
@@ -131,6 +135,41 @@ export default function AudioArticlePage() {
     }
   }, [isLoaded, isSignedIn, orgId, fetchArticles])
 
+  // Scrape article from URL
+  const handleScrapeUrl = async () => {
+    if (!articleUrl.trim()) {
+      alert('Veuillez entrer une URL')
+      return
+    }
+
+    setIsScraping(true)
+    try {
+      const response = await fetch('/api/audio-article/scrape', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: articleUrl }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Erreur lors du scraping')
+      }
+
+      setArticle(prev => ({
+        ...prev,
+        originalText: data.text,
+        title: data.title || '',
+      }))
+      setArticleUrl('') // Clear URL after success
+    } catch (error) {
+      console.error('Error scraping:', error)
+      alert(error instanceof Error ? error.message : 'Erreur lors du scraping')
+    } finally {
+      setIsScraping(false)
+    }
+  }
+
   // Reset creation state when switching to create mode
   const startCreation = () => {
     setArticle({
@@ -140,6 +179,7 @@ export default function AudioArticlePage() {
       voiceId: 'Wise_Woman',
       title: '',
     })
+    setArticleUrl('')
     setCurrentStep(1)
     setViewMode('create')
   }
@@ -561,20 +601,70 @@ export default function AudioArticlePage() {
                     <div className="space-y-6">
                       <div>
                         <h2 className="text-xl font-semibold mb-2" style={{ color: 'var(--brand-text)' }}>
-                          Étape 1 : Collez votre article
+                          Étape 1 : Importez votre article
                         </h2>
                         <p className="text-sm" style={{ color: 'var(--brand-text)', opacity: 0.6 }}>
-                          Copiez-collez le texte de l'article que vous souhaitez résumer
+                          Importez depuis une URL ou copiez-collez le texte manuellement
                         </p>
                       </div>
 
+                      {/* URL Scraping Option */}
+                      <div 
+                        className="p-4 rounded-lg border"
+                        style={{ borderColor: 'var(--brand-accent)', backgroundColor: 'rgba(var(--brand-accent-rgb), 0.05)' }}
+                      >
+                        <div className="flex items-center gap-2 mb-3">
+                          <Globe className="h-5 w-5" style={{ color: 'var(--brand-accent)' }} />
+                          <Label className="font-medium" style={{ color: 'var(--brand-text)' }}>
+                            Importer depuis une URL
+                          </Label>
+                        </div>
+                        <div className="flex gap-2">
+                          <Input
+                            value={articleUrl}
+                            onChange={(e) => setArticleUrl(e.target.value)}
+                            placeholder="https://example.com/article..."
+                            className="flex-1"
+                            disabled={isScraping}
+                          />
+                          <Button
+                            onClick={handleScrapeUrl}
+                            disabled={!articleUrl.trim() || isScraping}
+                            variant="outline"
+                          >
+                            {isScraping ? (
+                              <>
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                Extraction...
+                              </>
+                            ) : (
+                              <>
+                                <Link className="h-4 w-4 mr-2" />
+                                Extraire
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                        <p className="text-xs mt-2" style={{ color: 'var(--brand-text)', opacity: 0.5 }}>
+                          Fonctionne avec la plupart des sites d'actualités
+                        </p>
+                      </div>
+
+                      {/* Divider */}
+                      <div className="flex items-center gap-4">
+                        <div className="flex-1 border-t" style={{ borderColor: 'var(--brand-secondary)' }} />
+                        <span className="text-sm" style={{ color: 'var(--brand-text)', opacity: 0.5 }}>ou</span>
+                        <div className="flex-1 border-t" style={{ borderColor: 'var(--brand-secondary)' }} />
+                      </div>
+
+                      {/* Manual Text Input */}
                       <div>
                         <Label>Texte de l'article</Label>
                         <Textarea
                           value={article.originalText}
                           onChange={(e) => setArticle(prev => ({ ...prev, originalText: e.target.value }))}
                           placeholder="Collez le texte de votre article ici..."
-                          className="mt-2 min-h-[300px]"
+                          className="mt-2 min-h-[250px]"
                         />
                         <p className="text-xs mt-2" style={{ color: 'var(--brand-text)', opacity: 0.5 }}>
                           {article.originalText.length} caractères

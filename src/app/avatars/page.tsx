@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { useAuth } from '@clerk/nextjs'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -30,17 +31,20 @@ interface Avatar {
 }
 
 export default function AvatarsPage() {
+  const { isLoaded, isSignedIn, orgId } = useAuth()
   const [avatars, setAvatars] = useState<Avatar[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editingAvatar, setEditingAvatar] = useState<Avatar | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    loadAvatars()
-  }, [])
-
-  const loadAvatars = async () => {
+  const loadAvatars = useCallback(async () => {
+    if (!isLoaded || !isSignedIn) {
+      setLoading(false)
+      return
+    }
+    
+    setLoading(true)
     try {
       const response = await fetch('/api/avatars')
       const data = await response.json()
@@ -50,7 +54,14 @@ export default function AvatarsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [isLoaded, isSignedIn])
+
+  // Fetch when auth is ready or org changes
+  useEffect(() => {
+    if (isLoaded) {
+      loadAvatars()
+    }
+  }, [isLoaded, isSignedIn, orgId, loadAvatars])
 
   const handleDelete = async (avatar: Avatar) => {
     if (avatar.isDefault) {

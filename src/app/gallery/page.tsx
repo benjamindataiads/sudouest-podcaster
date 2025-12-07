@@ -2,9 +2,10 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useState, useEffect, Suspense, useRef } from 'react'
+import { useState, useEffect, Suspense, useRef, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import { useAuth } from '@clerk/nextjs'
 import { useVideoGeneration } from '@/contexts/VideoGenerationContext'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -55,6 +56,7 @@ interface SelectedVideo {
 }
 
 function GalleryPageContent() {
+  const { isLoaded, isSignedIn, orgId } = useAuth()
   const searchParams = useSearchParams()
   const podcastId = searchParams.get('podcastId') ? parseInt(searchParams.get('podcastId')!) : null
   
@@ -76,21 +78,23 @@ function GalleryPageContent() {
   const [subtitledVideoUrl, setSubtitledVideoUrl] = useState<string>('')
   const [showSubtitleOptions, setShowSubtitleOptions] = useState(false)
 
-  // Charger le podcast pour afficher la navigation
+  // Charger le podcast pour afficher la navigation (wait for auth)
   useEffect(() => {
+    if (!isLoaded || !isSignedIn) return
+    
     if (podcastId) {
       fetch(`/api/podcasts/${podcastId}`)
         .then(res => res.json())
         .then(data => {
           setPodcast(data.podcast)
           // Si le podcast a déjà une vidéo finale, l'afficher
-          if (data.podcast.finalVideoUrl) {
+          if (data.podcast?.finalVideoUrl) {
             setMergedVideoUrl(data.podcast.finalVideoUrl)
           }
         })
         .catch(err => console.error('Error loading podcast:', err))
     }
-  }, [podcastId])
+  }, [podcastId, isLoaded, isSignedIn, orgId])
 
   const completedJobs = jobs.filter(job => job.status === 'completed')
   const generatingJobs = jobs.filter(job => job.status === 'generating' || job.status === 'queued')
@@ -98,7 +102,9 @@ function GalleryPageContent() {
 
   // Charger les jobs au montage (filtrés par podcast si podcastId fourni)
   useEffect(() => {
-    console.log(`📂 Loading gallery for podcast: ${podcastId || 'all'}`)
+    if (!isLoaded || !isSignedIn) return
+    
+    console.log(`📂 Loading gallery for podcast: ${podcastId || 'all'} (org: ${orgId})`)
     
     // Vérifier les jobs bloqués avant de charger
     fetch('/api/video-jobs/check-stale')
@@ -112,7 +118,7 @@ function GalleryPageContent() {
       .finally(() => {
         refreshJobs(podcastId || undefined)
       })
-  }, [podcastId, refreshJobs])
+  }, [podcastId, refreshJobs, isLoaded, isSignedIn, orgId])
 
   // Rafraîchir automatiquement si des vidéos sont en cours de génération
   useEffect(() => {

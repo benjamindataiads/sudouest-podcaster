@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
+import { useAuth } from '@clerk/nextjs'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -301,6 +302,7 @@ function PodcastsByDate({
 }
 
 export default function HomePage() {
+  const { isLoaded, isSignedIn, orgId } = useAuth()
   const [podcasts, setPodcasts] = useState<Podcast[]>([])
   const [loading, setLoading] = useState(true)
   const [showHowItWorks, setShowHowItWorks] = useState(false)
@@ -308,11 +310,13 @@ export default function HomePage() {
   const [videoDialogOpen, setVideoDialogOpen] = useState(false)
   const [selectedVideo, setSelectedVideo] = useState<{url: string, title: string} | null>(null)
 
-  useEffect(() => {
-    fetchLatestPodcasts()
-  }, [])
-
-  const fetchLatestPodcasts = async () => {
+  const fetchLatestPodcasts = useCallback(async () => {
+    if (!isLoaded || !isSignedIn) {
+      setLoading(false)
+      return
+    }
+    
+    setLoading(true)
     try {
       const response = await fetch('/api/podcasts/latest')
       if (response.ok) {
@@ -326,7 +330,14 @@ export default function HomePage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [isLoaded, isSignedIn])
+
+  // Fetch when auth is ready or org changes
+  useEffect(() => {
+    if (isLoaded) {
+      fetchLatestPodcasts()
+    }
+  }, [isLoaded, isSignedIn, orgId, fetchLatestPodcasts])
 
   const handleDeletePodcast = async (podcastId: number) => {
     if (!confirm('Êtes-vous sûr de vouloir supprimer ce podcast ? Cette action est irréversible.')) {

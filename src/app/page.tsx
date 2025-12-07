@@ -410,8 +410,8 @@ export default function HomePage() {
         <div className="p-6 lg:p-8">
           {/* Page Header */}
           <div className="mb-8">
-            <h1 className="text-2xl font-bold mb-2" style={{ color: 'var(--brand-text)' }}>Mes podcasts</h1>
-            <p style={{ color: 'var(--brand-text)', opacity: 0.6 }}>Créez et gérez vos podcasts audio et vidéo</p>
+            <h1 className="text-2xl font-bold mb-2" style={{ color: 'var(--brand-text)' }}>Mes Avatar Shorts</h1>
+            <p style={{ color: 'var(--brand-text)', opacity: 0.6 }}>Créez et gérez vos vidéos courtes avec avatar IA</p>
           </div>
 
           {/* Create CTA */}
@@ -422,14 +422,14 @@ export default function HomePage() {
                   <Mic className="h-6 w-6" style={{ color: 'var(--brand-accent)' }} />
                 </div>
                 <div>
-                  <h2 className="font-semibold" style={{ color: 'var(--brand-text)' }}>Créer un nouveau podcast</h2>
-                  <p className="text-sm" style={{ color: 'var(--brand-text)', opacity: 0.6 }}>Transformez l'actualité en contenu audio/vidéo</p>
+                  <h2 className="font-semibold" style={{ color: 'var(--brand-text)' }}>Créer un nouveau short</h2>
+                  <p className="text-sm" style={{ color: 'var(--brand-text)', opacity: 0.6 }}>Transformez l'actualité en vidéo courte avec avatar</p>
                 </div>
               </div>
               <CreatePodcastDialog>
                 <Button>
                   <Plus className="h-4 w-4 mr-2" />
-                  Nouveau podcast
+                  Nouveau short
                 </Button>
               </CreatePodcastDialog>
             </div>
@@ -459,15 +459,15 @@ export default function HomePage() {
                 <Film className="h-8 w-8" style={{ color: 'var(--brand-text)', opacity: 0.4 }} />
               </div>
               <h3 className="text-lg font-semibold mb-2" style={{ color: 'var(--brand-text)' }}>
-                Aucun podcast créé
+                Aucun short créé
               </h3>
               <p className="mb-6" style={{ color: 'var(--brand-text)', opacity: 0.6 }}>
-                Créez votre premier podcast en quelques clics
+                Créez votre premier avatar short en quelques clics
               </p>
               <CreatePodcastDialog>
                 <Button>
                   <Plus className="h-4 w-4 mr-2" />
-                  Créer mon premier podcast
+                  Créer mon premier short
                 </Button>
               </CreatePodcastDialog>
             </div>
@@ -512,7 +512,7 @@ export default function HomePage() {
                     </div>
                     <h3 className="font-semibold mb-2" style={{ color: 'var(--brand-text)' }}>Script éditable</h3>
                     <p className="text-sm" style={{ color: 'var(--brand-text)', opacity: 0.6 }}>
-                      Personnalisez votre script de podcast
+                      Personnalisez votre script vidéo
                     </p>
                   </CardContent>
                 </Card>
@@ -535,7 +535,7 @@ export default function HomePage() {
           {/* Footer */}
           <footer className="mt-12 pt-6" style={{ borderTop: '1px solid var(--brand-secondary)' }}>
             <div className="flex items-center justify-between text-sm" style={{ color: 'var(--brand-text)', opacity: 0.4 }}>
-              <span>Podcaster © 2025</span>
+              <span>Video Creator © 2025</span>
               <span>POC Propulsé par l'IA et Carole Fourcade</span>
             </div>
           </footer>

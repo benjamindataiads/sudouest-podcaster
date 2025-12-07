@@ -23,7 +23,9 @@ import {
   Menu,
   X,
   ChevronRight,
-  LogIn
+  LogIn,
+  Newspaper,
+  Video
 } from 'lucide-react'
 
 interface NavItem {
@@ -32,9 +34,13 @@ interface NavItem {
   icon: React.ReactNode
 }
 
-const podcastItems: NavItem[] = [
-  { label: 'Mes podcasts', href: '/', icon: <Mic className="h-5 w-5" /> },
+const avatarShortsItems: NavItem[] = [
+  { label: 'Mes shorts', href: '/', icon: <Video className="h-5 w-5" /> },
   { label: 'Galerie', href: '/gallery', icon: <Film className="h-5 w-5" /> },
+]
+
+const videoArticleItems: NavItem[] = [
+  { label: 'Vidéos Article', href: '/video-article', icon: <Newspaper className="h-5 w-5" /> },
 ]
 
 const avatarItems: NavItem[] = [
@@ -128,8 +134,8 @@ export default function Sidebar() {
           <div className="flex items-center gap-3 p-4">
             <OrgLogo />
             <div className="flex-1 min-w-0">
-              <h1 className="font-bold truncate" style={{ color: 'var(--brand-text)' }}>Podcaster</h1>
-              <p className="text-xs" style={{ color: 'var(--brand-text)', opacity: 0.6 }}>Créateur de podcasts IA</p>
+              <h1 className="font-bold truncate" style={{ color: 'var(--brand-text)' }}>Video Creator</h1>
+              <p className="text-xs" style={{ color: 'var(--brand-text)', opacity: 0.6 }}>Créateur de vidéos IA</p>
             </div>
           </div>
         </SignedOut>
@@ -137,7 +143,8 @@ export default function Sidebar() {
 
       {/* Navigation */}
       <div className="flex-1 overflow-y-auto px-3 py-4">
-        <NavSection title="Podcasts" items={podcastItems} />
+        <NavSection title="Avatar Shorts" items={avatarShortsItems} />
+        <NavSection title="Video Article" items={videoArticleItems} />
         <NavSection title="Personnages" items={avatarItems} />
       </div>
 

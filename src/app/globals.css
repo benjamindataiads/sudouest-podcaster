@@ -102,3 +102,40 @@
   }
 }
 
+/* Tab active state */
+[data-state="active"][data-brand-active="true"] {
+  background-color: var(--brand-primary) !important;
+  color: var(--brand-text) !important;
+}
+
+/* Scrollbar hide utility */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Dialog and popup backgrounds */
+[role="dialog"] {
+  background-color: var(--brand-primary);
+  color: var(--brand-text);
+}
+
+/* Select dropdown styling */
+[role="listbox"],
+[data-radix-popper-content-wrapper] [role="listbox"] {
+  background-color: var(--brand-primary) !important;
+  border-color: var(--brand-secondary) !important;
+}
+
+[role="option"] {
+  color: var(--brand-text);
+}
+
+[role="option"]:hover,
+[role="option"][data-highlighted] {
+  background-color: var(--brand-secondary) !important;
+}
+

@@ -159,19 +159,18 @@ export default function VideoSettingsPage() {
 
   // Handle image upload for AI generation
   const handleImageUpload = async (file: File, type: 'intro' | 'outro') => {
-    // Upload image first
     const formData = new FormData()
     formData.append('file', file)
 
     try {
-      // Use avatar upload endpoint to handle image uploads
-      const response = await fetch('/api/avatars/upload', {
+      const response = await fetch('/api/settings/video/upload-image', {
         method: 'POST',
         body: formData,
       })
 
       if (!response.ok) {
-        throw new Error('Image upload failed')
+        const error = await response.json()
+        throw new Error(error.error || 'Image upload failed')
       }
 
       const data = await response.json()
@@ -183,7 +182,7 @@ export default function VideoSettingsPage() {
       }
     } catch (error) {
       console.error('Image upload error:', error)
-      alert('Erreur lors de l\'upload de l\'image')
+      alert(`Erreur lors de l'upload de l'image: ${error instanceof Error ? error.message : 'Erreur inconnue'}`)
     }
   }
 

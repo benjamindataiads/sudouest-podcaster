@@ -4,10 +4,14 @@ import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 const isPublicRoute = createRouteMatcher([
   '/sign-in(.*)',
   '/sign-up(.*)',
+  // Public audio article pages (for sharing)
+  '/audio-article/:id',
+  '/audio-article/:id/embed(.*)',
   // API routes that must be public (webhooks from external services)
   '/api/webhooks(.*)',
   '/api/files(.*)',
   '/api/db/migrate(.*)',
+  '/api/audio-article/:id(.*)', // Public API for audio articles
 ])
 
 export default clerkMiddleware(async (auth, req) => {

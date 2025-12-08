@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
+import { useAuth } from '@clerk/nextjs'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { 
@@ -28,6 +29,7 @@ interface AudioArticle {
 export default function AudioArticleViewPage() {
   const params = useParams()
   const id = params.id as string
+  const { isSignedIn } = useAuth()
   
   const [article, setArticle] = useState<AudioArticle | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -110,12 +112,14 @@ export default function AudioArticleViewPage() {
         <Card className="max-w-md">
           <CardContent className="p-6 text-center">
             <p className="text-red-500 mb-4">{error || 'Article non trouvé'}</p>
-            <Link href="/audio-article">
-              <Button variant="outline">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Retour
-              </Button>
-            </Link>
+            {isSignedIn && (
+              <Link href="/audio-article">
+                <Button variant="outline">
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Retour
+                </Button>
+              </Link>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -125,11 +129,13 @@ export default function AudioArticleViewPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 py-12 px-4">
       <div className="max-w-2xl mx-auto">
-        {/* Back Link */}
-        <Link href="/audio-article" className="inline-flex items-center text-gray-600 hover:text-gray-900 mb-6">
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Retour aux articles
-        </Link>
+        {/* Back Link - only show for authenticated users */}
+        {isSignedIn && (
+          <Link href="/audio-article" className="inline-flex items-center text-gray-600 hover:text-gray-900 mb-6">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Retour aux articles
+          </Link>
+        )}
 
         {/* Main Card */}
         <Card className="overflow-hidden shadow-xl">
@@ -226,6 +232,24 @@ export default function AudioArticleViewPage() {
                           {style === 'full' && 'Complet'}
                         </button>
                       ))}
+                    </div>
+                  </div>
+
+                  {/* Live Preview */}
+                  <div>
+                    <p className="text-sm font-medium text-gray-700 mb-2">Aperçu</p>
+                    <div className={`bg-white rounded-lg border overflow-hidden ${
+                      embedStyle === 'minimal' ? 'h-20' : 
+                      embedStyle === 'card' ? 'h-48' : 'h-96'
+                    }`}>
+                      <iframe
+                        src={`/audio-article/${id}/embed?style=${embedStyle}`}
+                        width="100%"
+                        height="100%"
+                        frameBorder="0"
+                        allow="autoplay"
+                        className="w-full h-full"
+                      />
                     </div>
                   </div>
 

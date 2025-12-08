@@ -30,38 +30,38 @@ interface VideoSettings {
   outroPrompt?: string
 }
 
-// Step 1: Image generation params
-interface ImageGenParams {
-  prompt: string
-  width: number
-  height: number
-  style: string
+// Step 1: Image transformation params (nano-banana-pro)
+interface ImageTransformParams {
+  sourceImageUrl: string      // Image source à transformer
+  prompt: string              // Prompt de transformation
+  resolution: '1K' | '2K' | '4K'
+  aspectRatio: string
+  outputFormat: 'png' | 'jpeg' | 'webp'
 }
 
-// Step 2: Video generation params
+// Step 2: Video generation params (Veo 3.1)
 interface VideoGenParams {
-  imageUrl: string
-  prompt: string
+  imageUrl: string            // Image transformée pour la vidéo
+  prompt: string              // Prompt d'animation
   aspectRatio: '9:16' | '16:9'
   duration: '4s' | '6s' | '8s'
   generateAudio: boolean
   resolution: '720p' | '1080p'
 }
 
-// Style options for Recraft v3
-const IMAGE_STYLES = [
-  { value: 'realistic_image', label: 'Réaliste' },
-  { value: 'digital_illustration', label: 'Illustration digitale' },
-  { value: 'vector_illustration', label: 'Illustration vectorielle' },
-  { value: 'icon', label: 'Icône' },
+// Resolution options for nano-banana-pro
+const IMAGE_RESOLUTIONS = [
+  { value: '1K', label: '1K (1024px)' },
+  { value: '2K', label: '2K (2048px)' },
+  { value: '4K', label: '4K (4096px)' },
 ]
 
-// Size presets
-const IMAGE_SIZES = [
-  { value: '1280x720', label: '1280×720 (16:9)', width: 1280, height: 720 },
-  { value: '720x1280', label: '720×1280 (9:16)', width: 720, height: 1280 },
-  { value: '1024x1024', label: '1024×1024 (1:1)', width: 1024, height: 1024 },
-  { value: '1920x1080', label: '1920×1080 (Full HD)', width: 1920, height: 1080 },
+// Aspect ratio options
+const ASPECT_RATIOS = [
+  { value: 'auto', label: 'Auto (garder original)' },
+  { value: '9:16', label: '9:16 (Portrait)' },
+  { value: '16:9', label: '16:9 (Paysage)' },
+  { value: '1:1', label: '1:1 (Carré)' },
 ]
 
 const DEFAULT_INTRO_PROMPT = `Animation cinématique d'ouverture pour un podcast. 
@@ -91,19 +91,21 @@ export default function VideoSettingsPage() {
   const introImageRef = useRef<HTMLInputElement>(null)
   const outroImageRef = useRef<HTMLInputElement>(null)
   
-  // Step 1: Image generation params
-  const [introImageParams, setIntroImageParams] = useState<ImageGenParams>({
-    prompt: 'Logo professionnel de podcast avec effets lumineux, fond sombre élégant, style moderne et cinématique',
-    width: 720,
-    height: 1280,
-    style: 'digital_illustration',
+  // Step 1: Image transformation params (nano-banana-pro)
+  const [introImageParams, setIntroImageParams] = useState<ImageTransformParams>({
+    sourceImageUrl: '',
+    prompt: 'Style cinématique professionnel, ajout d\'effets lumineux subtils, ambiance moderne et élégante pour intro de podcast vidéo',
+    resolution: '2K',
+    aspectRatio: '9:16',
+    outputFormat: 'png',
   })
   
-  const [outroImageParams, setOutroImageParams] = useState<ImageGenParams>({
-    prompt: 'Écran de fin de podcast avec texte "Merci", design élégant, fond sombre avec particules lumineuses',
-    width: 720,
-    height: 1280,
-    style: 'digital_illustration',
+  const [outroImageParams, setOutroImageParams] = useState<ImageTransformParams>({
+    sourceImageUrl: '',
+    prompt: 'Style cinématique professionnel, ajout d\'effets de fondu élégant, ambiance de conclusion pour outro de podcast',
+    resolution: '2K',
+    aspectRatio: '9:16',
+    outputFormat: 'png',
   })
   
   // Step 2: Video generation params  
@@ -228,22 +230,56 @@ export default function VideoSettingsPage() {
     }
   }
 
-  // Step 1: Generate image with Recraft v3
-  const handleGenerateImage = async (type: 'intro' | 'outro') => {
+  // Handle source image upload for nano-banana-pro
+  const handleSourceImageUpload = async (file: File, type: 'intro' | 'outro') => {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    try {
+      const response = await fetch('/api/settings/video/upload-image', {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Image upload failed')
+      }
+
+      const data = await response.json()
+      
+      if (type === 'intro') {
+        setIntroImageParams(prev => ({ ...prev, sourceImageUrl: data.url }))
+      } else {
+        setOutroImageParams(prev => ({ ...prev, sourceImageUrl: data.url }))
+      }
+    } catch (error) {
+      console.error('Source image upload error:', error)
+      alert(`Erreur lors de l'upload: ${error instanceof Error ? error.message : 'Erreur inconnue'}`)
+    }
+  }
+
+  // Step 1: Transform image with nano-banana-pro
+  const handleTransformImage = async (type: 'intro' | 'outro') => {
     const params = type === 'intro' ? introImageParams : outroImageParams
     
+    if (!params.sourceImageUrl) {
+      alert('Veuillez d\'abord uploader une image source')
+      return
+    }
+
     if (!params.prompt.trim()) {
-      alert('Veuillez entrer un prompt pour l\'image')
+      alert('Veuillez entrer un prompt de transformation')
       return
     }
 
     setIsGeneratingImage(true)
-    setGenerationMessage('Génération de l\'image...')
+    setGenerationMessage('Transformation de l\'image...')
 
     const messages = [
-      'Analyse du prompt...',
-      'Génération avec Recraft v3...',
-      'Création de l\'image...',
+      'Analyse de l\'image source...',
+      'Application du style avec Nano-Banana Pro...',
+      'Transformation en cours...',
       'Finalisation...',
     ]
     let msgIndex = 0
@@ -253,14 +289,16 @@ export default function VideoSettingsPage() {
     }, 3000)
 
     try {
-      const response = await fetch('/api/genai/image-generate', {
+      const response = await fetch('/api/genai/image-edit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prompt: params.prompt,
-          width: params.width,
-          height: params.height,
-          style: params.style,
+          imageUrls: [params.sourceImageUrl],
+          numImages: 1,
+          aspectRatio: params.aspectRatio,
+          resolution: params.resolution,
+          outputFormat: params.outputFormat,
         }),
       })
 
@@ -268,24 +306,28 @@ export default function VideoSettingsPage() {
 
       if (!response.ok) {
         const error = await response.json()
-        throw new Error(error.details || error.error || 'Image generation failed')
+        throw new Error(error.details || error.error || 'Image transformation failed')
       }
 
       const data = await response.json()
       
-      // Set the image URL for step 2
+      if (!data.images?.[0]?.url) {
+        throw new Error('No image returned')
+      }
+      
+      // Set the transformed image URL for step 2
       if (type === 'intro') {
-        setIntroVideoParams(prev => ({ ...prev, imageUrl: data.imageUrl }))
+        setIntroVideoParams(prev => ({ ...prev, imageUrl: data.images[0].url }))
       } else {
-        setOutroVideoParams(prev => ({ ...prev, imageUrl: data.imageUrl }))
+        setOutroVideoParams(prev => ({ ...prev, imageUrl: data.images[0].url }))
       }
       
       setCurrentStep(2) // Move to step 2
-      alert('✅ Image générée ! Passez à l\'étape 2 pour créer la vidéo.')
+      alert('✅ Image transformée ! Passez à l\'étape 2 pour créer la vidéo.')
     } catch (error) {
       clearInterval(interval)
-      console.error('Image generation error:', error)
-      alert(`Erreur: ${error instanceof Error ? error.message : 'Generation failed'}`)
+      console.error('Image transformation error:', error)
+      alert(`Erreur: ${error instanceof Error ? error.message : 'Transformation failed'}`)
     } finally {
       setIsGeneratingImage(false)
       setGenerationMessage('')
@@ -567,93 +609,21 @@ export default function VideoSettingsPage() {
                     </button>
                   </div>
 
-                  {/* STEP 1: Image Generation */}
+                  {/* STEP 1: Image Transformation with Nano-Banana Pro */}
                   {currentStep === 1 && (
                     <div className="space-y-4 p-4 border rounded-lg">
                       <h3 className="font-semibold flex items-center gap-2">
                         <ImageIcon className="h-5 w-5" />
-                        Étape 1 : Générer ou uploader une image
+                        Étape 1 : Transformer une image (Nano-Banana Pro)
                       </h3>
+                      <p className="text-sm text-gray-500">
+                        Uploadez votre logo ou image, puis appliquez un style cinématique pour l'intro/outro
+                      </p>
 
-                      {/* Image Prompt */}
-                      <div>
-                        <Label>Prompt pour l'image (Recraft v3)</Label>
-                        <Textarea
-                          value={currentImageParams.prompt}
-                          onChange={(e) => setCurrentImageParams(prev => ({ ...prev, prompt: e.target.value }))}
-                          placeholder="Décrivez l'image souhaitée..."
-                          className="mt-2 min-h-[80px]"
-                        />
-                      </div>
-
-                      {/* Image Parameters */}
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label>Taille</Label>
-                          <Select
-                            value={`${currentImageParams.width}x${currentImageParams.height}`}
-                            onValueChange={(value) => {
-                              const size = IMAGE_SIZES.find(s => s.value === value)
-                              if (size) {
-                                setCurrentImageParams(prev => ({ 
-                                  ...prev, 
-                                  width: size.width, 
-                                  height: size.height 
-                                }))
-                              }
-                            }}
-                          >
-                            <SelectTrigger className="mt-2">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {IMAGE_SIZES.map(size => (
-                                <SelectItem key={size.value} value={size.value}>
-                                  {size.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        <div>
-                          <Label>Style</Label>
-                          <Select
-                            value={currentImageParams.style}
-                            onValueChange={(value) => setCurrentImageParams(prev => ({ ...prev, style: value }))}
-                          >
-                            <SelectTrigger className="mt-2">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {IMAGE_STYLES.map(style => (
-                                <SelectItem key={style.value} value={style.value}>
-                                  {style.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-
-                      {/* Generate Image Button */}
-                      {isGeneratingImage ? (
-                        <div className="p-4 rounded-lg text-center bg-purple-600 text-white">
-                          <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
-                          <p className="font-medium">Génération de l'image...</p>
-                          <p className="text-white/70 text-sm animate-pulse">{generationMessage}</p>
-                        </div>
-                      ) : (
-                        <div className="flex gap-2">
-                          <Button
-                            onClick={() => handleGenerateImage(activeTab)}
-                            disabled={!currentImageParams.prompt.trim()}
-                            className="flex-1"
-                          >
-                            <Sparkles className="h-4 w-4 mr-2" />
-                            Générer avec Recraft v3
-                          </Button>
-                          <span className="flex items-center text-gray-400">ou</span>
+                      {/* Source Image Upload */}
+                      <div className="p-4 border-2 border-dashed rounded-lg">
+                        <Label className="mb-2 block font-medium">Image source</Label>
+                        <div className="flex gap-4 items-center">
                           <input
                             type="file"
                             ref={imageRef}
@@ -661,30 +631,190 @@ export default function VideoSettingsPage() {
                             className="hidden"
                             onChange={(e) => {
                               const file = e.target.files?.[0]
-                              if (file) handleImageUpload(file, activeTab)
+                              if (file) handleSourceImageUpload(file, activeTab)
                             }}
                           />
+                          
+                          {currentImageParams.sourceImageUrl ? (
+                            <div className="relative">
+                              <img 
+                                src={currentImageParams.sourceImageUrl} 
+                                alt="Source" 
+                                className="w-24 h-24 object-cover rounded-lg border"
+                              />
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="absolute -top-2 -right-2 h-6 w-6 p-0 rounded-full bg-red-500 text-white hover:bg-red-600"
+                                onClick={() => setCurrentImageParams(prev => ({ ...prev, sourceImageUrl: '' }))}
+                              >
+                                ×
+                              </Button>
+                            </div>
+                          ) : (
+                            <Button
+                              variant="outline"
+                              onClick={() => imageRef.current?.click()}
+                              className="w-24 h-24 border-dashed"
+                            >
+                              <div className="flex flex-col items-center gap-1">
+                                <Upload className="h-6 w-6" />
+                                <span className="text-xs">Upload</span>
+                              </div>
+                            </Button>
+                          )}
+                          
+                          <div className="flex-1 text-sm text-gray-500">
+                            <p>Uploadez votre logo, une image de fond, ou une photo.</p>
+                            <p className="text-xs mt-1">Formats: JPG, PNG, WebP (max 10MB)</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Transformation Prompt */}
+                      <div>
+                        <Label>Prompt de transformation</Label>
+                        <Textarea
+                          value={currentImageParams.prompt}
+                          onChange={(e) => setCurrentImageParams(prev => ({ ...prev, prompt: e.target.value }))}
+                          placeholder="Décrivez le style à appliquer..."
+                          className="mt-2 min-h-[80px]"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Ex: "Style cinématique, ajout d'effets lumineux, ambiance professionnelle"
+                        </p>
+                      </div>
+
+                      {/* Transformation Parameters */}
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <Label>Résolution</Label>
+                          <Select
+                            value={currentImageParams.resolution}
+                            onValueChange={(value: '1K' | '2K' | '4K') => 
+                              setCurrentImageParams(prev => ({ ...prev, resolution: value }))
+                            }
+                          >
+                            <SelectTrigger className="mt-2">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {IMAGE_RESOLUTIONS.map(res => (
+                                <SelectItem key={res.value} value={res.value}>
+                                  {res.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div>
+                          <Label>Format</Label>
+                          <Select
+                            value={currentImageParams.aspectRatio}
+                            onValueChange={(value) => setCurrentImageParams(prev => ({ ...prev, aspectRatio: value }))}
+                          >
+                            <SelectTrigger className="mt-2">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {ASPECT_RATIOS.map(ratio => (
+                                <SelectItem key={ratio.value} value={ratio.value}>
+                                  {ratio.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div>
+                          <Label>Sortie</Label>
+                          <Select
+                            value={currentImageParams.outputFormat}
+                            onValueChange={(value: 'png' | 'jpeg' | 'webp') => 
+                              setCurrentImageParams(prev => ({ ...prev, outputFormat: value }))
+                            }
+                          >
+                            <SelectTrigger className="mt-2">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="png">PNG</SelectItem>
+                              <SelectItem value="jpeg">JPEG</SelectItem>
+                              <SelectItem value="webp">WebP</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      {/* Transform Image Button */}
+                      {isGeneratingImage ? (
+                        <div className="p-4 rounded-lg text-center bg-purple-600 text-white">
+                          <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+                          <p className="font-medium">Transformation en cours...</p>
+                          <p className="text-white/70 text-sm animate-pulse">{generationMessage}</p>
+                        </div>
+                      ) : (
+                        <div className="flex gap-2">
+                          <Button
+                            onClick={() => handleTransformImage(activeTab)}
+                            disabled={!currentImageParams.sourceImageUrl || !currentImageParams.prompt.trim()}
+                            className="flex-1"
+                          >
+                            <Sparkles className="h-4 w-4 mr-2" />
+                            Transformer avec Nano-Banana Pro
+                          </Button>
+                          <span className="flex items-center text-gray-400 px-2">ou</span>
                           <Button
                             variant="outline"
-                            onClick={() => imageRef.current?.click()}
+                            onClick={() => {
+                              if (currentImageParams.sourceImageUrl) {
+                                // Use source image directly without transformation
+                                if (activeTab === 'intro') {
+                                  setIntroVideoParams(prev => ({ ...prev, imageUrl: currentImageParams.sourceImageUrl }))
+                                } else {
+                                  setOutroVideoParams(prev => ({ ...prev, imageUrl: currentImageParams.sourceImageUrl }))
+                                }
+                                setCurrentStep(2)
+                              } else {
+                                alert('Veuillez d\'abord uploader une image')
+                              }
+                            }}
+                            disabled={!currentImageParams.sourceImageUrl}
                           >
-                            <Upload className="h-4 w-4 mr-2" />
-                            Uploader
+                            Utiliser sans transformation
+                            <ChevronRight className="h-4 w-4 ml-1" />
                           </Button>
                         </div>
                       )}
 
-                      {/* Preview of generated/uploaded image */}
+                      {/* Preview of transformed image */}
                       {currentVideoParams.imageUrl && (
                         <div className="p-4 border rounded-lg bg-green-50 border-green-200">
                           <div className="flex items-start gap-4">
-                            <img 
-                              src={currentVideoParams.imageUrl} 
-                              alt="Preview" 
-                              className="w-24 h-24 object-cover rounded-lg border"
-                            />
+                            <div className="flex gap-2">
+                              {currentImageParams.sourceImageUrl && (
+                                <div className="text-center">
+                                  <img 
+                                    src={currentImageParams.sourceImageUrl} 
+                                    alt="Original" 
+                                    className="w-20 h-20 object-cover rounded-lg border opacity-60"
+                                  />
+                                  <p className="text-xs text-gray-500 mt-1">Original</p>
+                                </div>
+                              )}
+                              <ChevronRight className="h-5 w-5 text-gray-400 self-center" />
+                              <div className="text-center">
+                                <img 
+                                  src={currentVideoParams.imageUrl} 
+                                  alt="Transformée" 
+                                  className="w-20 h-20 object-cover rounded-lg border-2 border-green-400"
+                                />
+                                <p className="text-xs text-green-600 mt-1">Transformée</p>
+                              </div>
+                            </div>
                             <div className="flex-1">
-                              <p className="font-medium text-green-800">✅ Image prête</p>
+                              <p className="font-medium text-green-800">✅ Image prête pour animation</p>
                               <p className="text-sm text-green-600">Passez à l'étape 2 pour créer la vidéo</p>
                               <Button
                                 size="sm"

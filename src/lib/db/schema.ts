@@ -38,6 +38,18 @@ export interface OrganizationBranding {
 }
 
 /**
+ * Organization video settings type (intro/outro)
+ */
+export interface OrganizationVideoSettings {
+  introVideoUrl?: string       // URL of uploaded or generated intro video
+  outroVideoUrl?: string       // URL of uploaded or generated outro video
+  introImageUrl?: string       // Image used to generate intro (for regeneration)
+  outroImageUrl?: string       // Image used to generate outro (for regeneration)
+  introPrompt?: string         // Prompt used to generate intro
+  outroPrompt?: string         // Prompt used to generate outro
+}
+
+/**
  * Table pour stocker les paramètres des organisations
  * L'orgId vient de Clerk Organizations
  */
@@ -46,6 +58,7 @@ export const organizationSettings = pgTable('organization_settings', {
   orgId: varchar('org_id', { length: 255 }).notNull().unique(), // Clerk Organization ID
   name: varchar('name', { length: 255 }).notNull(), // Organization display name
   branding: jsonb('branding').$type<OrganizationBranding>(),
+  videoSettings: jsonb('video_settings').$type<OrganizationVideoSettings>(), // Intro/outro video settings
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 })

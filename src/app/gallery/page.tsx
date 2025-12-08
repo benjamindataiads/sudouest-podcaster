@@ -55,6 +55,12 @@ interface SelectedVideo {
   order: number
 }
 
+// Video settings interface
+interface VideoSettings {
+  introVideoUrl?: string
+  outroVideoUrl?: string
+}
+
 function GalleryPageContent() {
   const { isLoaded, isSignedIn, orgId } = useAuth()
   const searchParams = useSearchParams()
@@ -69,6 +75,9 @@ function GalleryPageContent() {
   const [includeOutro, setIncludeOutro] = useState(false)
   const [podcast, setPodcast] = useState<{selectedArticles?: Array<Record<string, unknown>>, script?: Record<string, unknown>, audioChunks?: Array<Record<string, unknown>>, finalVideoUrl?: string} | null>(null)
   
+  // Organization video settings (intro/outro)
+  const [videoSettings, setVideoSettings] = useState<VideoSettings>({})
+  
   // Ref to prevent multiple workers from running simultaneously
   const workerRunningRef = useRef(false)
   
@@ -77,6 +86,18 @@ function GalleryPageContent() {
   const [isGeneratingSubtitles, setIsGeneratingSubtitles] = useState(false)
   const [subtitledVideoUrl, setSubtitledVideoUrl] = useState<string>('')
   const [showSubtitleOptions, setShowSubtitleOptions] = useState(false)
+
+  // Fetch org video settings
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn || !orgId) return
+    
+    fetch('/api/settings/video')
+      .then(res => res.json())
+      .then(data => {
+        setVideoSettings(data.videoSettings || {})
+      })
+      .catch(err => console.error('Error loading video settings:', err))
+  }, [isLoaded, isSignedIn, orgId])
 
   // Charger le podcast pour afficher la navigation (wait for auth)
   useEffect(() => {
@@ -243,16 +264,16 @@ function GalleryPageContent() {
       // Construire la liste des vidéos avec intro/outro optionnels
       const videoUrls: string[] = []
       
-      if (includeIntro) {
-        videoUrls.push('https://dataiads-test1.fr/sudouest/intro.mp4')
+      if (includeIntro && videoSettings.introVideoUrl) {
+        videoUrls.push(videoSettings.introVideoUrl)
       }
       
       videoUrls.push(...selectedVideos
         .sort((a, b) => a.order - b.order)
         .map(v => v.videoUrl))
       
-      if (includeOutro) {
-        videoUrls.push('https://dataiads-test1.fr/sudouest/intro.mp4') // Même vidéo pour l'instant
+      if (includeOutro && videoSettings.outroVideoUrl) {
+        videoUrls.push(videoSettings.outroVideoUrl)
       }
 
       console.log('🎬 Starting merge of', videoUrls.length, 'videos (intro:', includeIntro, 'outro:', includeOutro, ')')
@@ -672,38 +693,53 @@ function GalleryPageContent() {
                     <div className="mt-4 space-y-3">
                       {/* Options intro/outro */}
                       <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg space-y-3">
-                        <h4 className="text-sm font-semibold text-gray-900">Options d'assemblage</h4>
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-sm font-semibold text-gray-900">Options d'assemblage</h4>
+                          <Link 
+                            href="/settings/video" 
+                            className="text-xs text-purple-600 hover:text-purple-700 flex items-center gap-1"
+                          >
+                            <Settings2 className="h-3 w-3" />
+                            Configurer
+                          </Link>
+                        </div>
                         
-                        <label className="flex items-start gap-3 cursor-pointer">
+                        <label className={`flex items-start gap-3 ${videoSettings.introVideoUrl ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'}`}>
                           <input
                             type="checkbox"
                             checked={includeIntro}
                             onChange={(e) => setIncludeIntro(e.target.checked)}
-                            className="mt-0.5 h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                            disabled={!videoSettings.introVideoUrl}
+                            className="mt-0.5 h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500 disabled:opacity-50"
                           />
                           <div className="flex-1">
                             <div className="text-sm font-medium text-gray-900">
                               Ajouter une intro
                             </div>
                             <div className="text-xs text-gray-500">
-                              Vidéo d'introduction au début
+                              {videoSettings.introVideoUrl 
+                                ? 'Vidéo d\'introduction au début' 
+                                : '⚠️ Non configurée - Configurer dans les paramètres'}
                             </div>
                           </div>
                         </label>
 
-                        <label className="flex items-start gap-3 cursor-pointer">
+                        <label className={`flex items-start gap-3 ${videoSettings.outroVideoUrl ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'}`}>
                           <input
                             type="checkbox"
                             checked={includeOutro}
                             onChange={(e) => setIncludeOutro(e.target.checked)}
-                            className="mt-0.5 h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                            disabled={!videoSettings.outroVideoUrl}
+                            className="mt-0.5 h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500 disabled:opacity-50"
                           />
                           <div className="flex-1">
                             <div className="text-sm font-medium text-gray-900">
                               Ajouter une outro
                             </div>
                             <div className="text-xs text-gray-500">
-                              Vidéo de conclusion à la fin
+                              {videoSettings.outroVideoUrl 
+                                ? 'Vidéo de conclusion à la fin' 
+                                : '⚠️ Non configurée - Configurer dans les paramètres'}
                             </div>
                           </div>
                         </label>

@@ -180,6 +180,22 @@ export async function register() {
       `)
       console.log('✅ audio_articles table verified')
 
+      // ============================================
+      // VIDEO SETTINGS COLUMN (intro/outro)
+      // ============================================
+      await db.execute(sql`
+        DO $$ 
+        BEGIN 
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name = 'organization_settings' AND column_name = 'video_settings'
+          ) THEN 
+            ALTER TABLE organization_settings ADD COLUMN video_settings JSONB;
+          END IF;
+        END $$;
+      `)
+      console.log('✅ organization_settings.video_settings column verified')
+
       console.log('✅ Database migrations completed successfully')
     } catch (error) {
       console.error('⚠️ Migration error (non-blocking):', error)

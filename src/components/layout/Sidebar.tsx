@@ -43,8 +43,9 @@ const audioArticleItems: NavItem[] = [
   { label: 'Audio Articles', href: '/audio-article', icon: <Newspaper className="h-5 w-5" /> },
 ]
 
-const avatarItems: NavItem[] = [
+const configItems: NavItem[] = [
   { label: 'Avatars', href: '/avatars', icon: <User className="h-5 w-5" /> },
+  { label: 'Intro / Outro', href: '/settings/video', icon: <Film className="h-5 w-5" /> },
 ]
 
 function NavSection({ 
@@ -145,11 +146,13 @@ export default function Sidebar() {
       <div className="flex-1 overflow-y-auto px-3 py-4">
         <NavSection title="Avatar Shorts" items={avatarShortsItems} />
         <NavSection title="Audio Article" items={audioArticleItems} />
-        <NavSection title="Personnages" items={avatarItems} />
       </div>
 
-      {/* Bottom section: Settings & User */}
+      {/* Bottom section: Configuration & User */}
       <div className="p-3 space-y-2" style={{ borderTop: '1px solid var(--brand-secondary)' }}>
+        {/* Configuration section */}
+        <NavSection title="Configuration" items={configItems} />
+
         {/* Settings - visible to all, page handles access control */}
         <Link
           href="/settings"

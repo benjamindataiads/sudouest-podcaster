@@ -30,7 +30,16 @@ interface VideoSettings {
   outroPrompt?: string
 }
 
-interface GenerationParams {
+// Step 1: Image generation params
+interface ImageGenParams {
+  prompt: string
+  width: number
+  height: number
+  style: string
+}
+
+// Step 2: Video generation params
+interface VideoGenParams {
   imageUrl: string
   prompt: string
   aspectRatio: '9:16' | '16:9'
@@ -38,6 +47,22 @@ interface GenerationParams {
   generateAudio: boolean
   resolution: '720p' | '1080p'
 }
+
+// Style options for Recraft v3
+const IMAGE_STYLES = [
+  { value: 'realistic_image', label: 'Réaliste' },
+  { value: 'digital_illustration', label: 'Illustration digitale' },
+  { value: 'vector_illustration', label: 'Illustration vectorielle' },
+  { value: 'icon', label: 'Icône' },
+]
+
+// Size presets
+const IMAGE_SIZES = [
+  { value: '1280x720', label: '1280×720 (16:9)', width: 1280, height: 720 },
+  { value: '720x1280', label: '720×1280 (9:16)', width: 720, height: 1280 },
+  { value: '1024x1024', label: '1024×1024 (1:1)', width: 1024, height: 1024 },
+  { value: '1920x1080', label: '1920×1080 (Full HD)', width: 1920, height: 1080 },
+]
 
 const DEFAULT_INTRO_PROMPT = `Animation cinématique d'ouverture pour un podcast. 
 La caméra effectue un lent zoom avant sur le logo/image.
@@ -55,9 +80,10 @@ export default function VideoSettingsPage() {
   const [isLoading, setIsLoading] = useState(true)
   
   // Generation state
-  const [isGeneratingIntro, setIsGeneratingIntro] = useState(false)
-  const [isGeneratingOutro, setIsGeneratingOutro] = useState(false)
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false)
+  const [isGeneratingVideo, setIsGeneratingVideo] = useState(false)
   const [generationMessage, setGenerationMessage] = useState('')
+  const [currentStep, setCurrentStep] = useState<1 | 2>(1)
   
   // Upload refs
   const introUploadRef = useRef<HTMLInputElement>(null)
@@ -65,8 +91,23 @@ export default function VideoSettingsPage() {
   const introImageRef = useRef<HTMLInputElement>(null)
   const outroImageRef = useRef<HTMLInputElement>(null)
   
-  // Generation params
-  const [introParams, setIntroParams] = useState<GenerationParams>({
+  // Step 1: Image generation params
+  const [introImageParams, setIntroImageParams] = useState<ImageGenParams>({
+    prompt: 'Logo professionnel de podcast avec effets lumineux, fond sombre élégant, style moderne et cinématique',
+    width: 720,
+    height: 1280,
+    style: 'digital_illustration',
+  })
+  
+  const [outroImageParams, setOutroImageParams] = useState<ImageGenParams>({
+    prompt: 'Écran de fin de podcast avec texte "Merci", design élégant, fond sombre avec particules lumineuses',
+    width: 720,
+    height: 1280,
+    style: 'digital_illustration',
+  })
+  
+  // Step 2: Video generation params  
+  const [introVideoParams, setIntroVideoParams] = useState<VideoGenParams>({
     imageUrl: '',
     prompt: DEFAULT_INTRO_PROMPT,
     aspectRatio: '9:16',
@@ -75,7 +116,7 @@ export default function VideoSettingsPage() {
     resolution: '720p',
   })
   
-  const [outroParams, setOutroParams] = useState<GenerationParams>({
+  const [outroVideoParams, setOutroVideoParams] = useState<VideoGenParams>({
     imageUrl: '',
     prompt: DEFAULT_OUTRO_PROMPT,
     aspectRatio: '9:16',
@@ -98,16 +139,16 @@ export default function VideoSettingsPage() {
           const data = await response.json()
           setVideoSettings(data.videoSettings || {})
           
-          // Pre-fill generation params if available
+          // Pre-fill video params if available
           if (data.videoSettings?.introImageUrl) {
-            setIntroParams(prev => ({
+            setIntroVideoParams(prev => ({
               ...prev,
               imageUrl: data.videoSettings.introImageUrl,
               prompt: data.videoSettings.introPrompt || DEFAULT_INTRO_PROMPT,
             }))
           }
           if (data.videoSettings?.outroImageUrl) {
-            setOutroParams(prev => ({
+            setOutroVideoParams(prev => ({
               ...prev,
               imageUrl: data.videoSettings.outroImageUrl,
               prompt: data.videoSettings.outroPrompt || DEFAULT_OUTRO_PROMPT,
@@ -176,37 +217,100 @@ export default function VideoSettingsPage() {
       const data = await response.json()
       
       if (type === 'intro') {
-        setIntroParams(prev => ({ ...prev, imageUrl: data.url }))
+        setIntroVideoParams(prev => ({ ...prev, imageUrl: data.url }))
       } else {
-        setOutroParams(prev => ({ ...prev, imageUrl: data.url }))
+        setOutroVideoParams(prev => ({ ...prev, imageUrl: data.url }))
       }
+      setCurrentStep(2) // Move to step 2
     } catch (error) {
       console.error('Image upload error:', error)
       alert(`Erreur lors de l'upload de l'image: ${error instanceof Error ? error.message : 'Erreur inconnue'}`)
     }
   }
 
-  // Generate video with Veo 3.1
-  const handleGenerate = async (type: 'intro' | 'outro') => {
-    const params = type === 'intro' ? introParams : outroParams
+  // Step 1: Generate image with Recraft v3
+  const handleGenerateImage = async (type: 'intro' | 'outro') => {
+    const params = type === 'intro' ? introImageParams : outroImageParams
+    
+    if (!params.prompt.trim()) {
+      alert('Veuillez entrer un prompt pour l\'image')
+      return
+    }
+
+    setIsGeneratingImage(true)
+    setGenerationMessage('Génération de l\'image...')
+
+    const messages = [
+      'Analyse du prompt...',
+      'Génération avec Recraft v3...',
+      'Création de l\'image...',
+      'Finalisation...',
+    ]
+    let msgIndex = 0
+    const interval = setInterval(() => {
+      msgIndex = (msgIndex + 1) % messages.length
+      setGenerationMessage(messages[msgIndex])
+    }, 3000)
+
+    try {
+      const response = await fetch('/api/genai/image-generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: params.prompt,
+          width: params.width,
+          height: params.height,
+          style: params.style,
+        }),
+      })
+
+      clearInterval(interval)
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.details || error.error || 'Image generation failed')
+      }
+
+      const data = await response.json()
+      
+      // Set the image URL for step 2
+      if (type === 'intro') {
+        setIntroVideoParams(prev => ({ ...prev, imageUrl: data.imageUrl }))
+      } else {
+        setOutroVideoParams(prev => ({ ...prev, imageUrl: data.imageUrl }))
+      }
+      
+      setCurrentStep(2) // Move to step 2
+      alert('✅ Image générée ! Passez à l\'étape 2 pour créer la vidéo.')
+    } catch (error) {
+      clearInterval(interval)
+      console.error('Image generation error:', error)
+      alert(`Erreur: ${error instanceof Error ? error.message : 'Generation failed'}`)
+    } finally {
+      setIsGeneratingImage(false)
+      setGenerationMessage('')
+    }
+  }
+
+  // Step 2: Generate video with Veo 3.1
+  const handleGenerateVideo = async (type: 'intro' | 'outro') => {
+    const params = type === 'intro' ? introVideoParams : outroVideoParams
     
     if (!params.imageUrl) {
-      alert('Veuillez d\'abord uploader une image')
+      alert('Veuillez d\'abord générer ou uploader une image (étape 1)')
       return
     }
 
     if (!params.prompt.trim()) {
-      alert('Veuillez entrer un prompt')
+      alert('Veuillez entrer un prompt pour la vidéo')
       return
     }
 
-    const setGenerating = type === 'intro' ? setIsGeneratingIntro : setIsGeneratingOutro
-    setGenerating(true)
-    setGenerationMessage('Préparation de la génération...')
+    setIsGeneratingVideo(true)
+    setGenerationMessage('Préparation de la génération vidéo...')
 
-    // Progress messages
     const messages = [
-      'Préparation de la génération...',
+      'Préparation de la génération vidéo...',
       'Envoi de l\'image à Veo 3.1...',
       'Analyse de l\'image...',
       'Génération de la vidéo...',
@@ -250,13 +354,14 @@ export default function VideoSettingsPage() {
         ),
       }))
       
+      setCurrentStep(1) // Reset to step 1
       alert(`✅ ${type === 'intro' ? 'Intro' : 'Outro'} générée avec succès !`)
     } catch (error) {
       clearInterval(interval)
       console.error('Generation error:', error)
       alert(`Erreur: ${error instanceof Error ? error.message : 'Generation failed'}`)
     } finally {
-      setGenerating(false)
+      setIsGeneratingVideo(false)
       setGenerationMessage('')
     }
   }
@@ -286,10 +391,11 @@ export default function VideoSettingsPage() {
       
       // Clear params
       if (type === 'intro') {
-        setIntroParams(prev => ({ ...prev, imageUrl: '' }))
+        setIntroVideoParams(prev => ({ ...prev, imageUrl: '' }))
       } else {
-        setOutroParams(prev => ({ ...prev, imageUrl: '' }))
+        setOutroVideoParams(prev => ({ ...prev, imageUrl: '' }))
       }
+      setCurrentStep(1)
     } catch (error) {
       console.error('Delete error:', error)
       alert('Erreur lors de la suppression')
@@ -305,9 +411,10 @@ export default function VideoSettingsPage() {
   }
 
   const currentVideo = activeTab === 'intro' ? videoSettings.introVideoUrl : videoSettings.outroVideoUrl
-  const currentParams = activeTab === 'intro' ? introParams : outroParams
-  const setCurrentParams = activeTab === 'intro' ? setIntroParams : setOutroParams
-  const isGenerating = activeTab === 'intro' ? isGeneratingIntro : isGeneratingOutro
+  const currentImageParams = activeTab === 'intro' ? introImageParams : outroImageParams
+  const setCurrentImageParams = activeTab === 'intro' ? setIntroImageParams : setOutroImageParams
+  const currentVideoParams = activeTab === 'intro' ? introVideoParams : outroVideoParams
+  const setCurrentVideoParams = activeTab === 'intro' ? setIntroVideoParams : setOutroVideoParams
   const imageRef = activeTab === 'intro' ? introImageRef : outroImageRef
   const uploadRef = activeTab === 'intro' ? introUploadRef : outroUploadRef
 
@@ -423,198 +530,342 @@ export default function VideoSettingsPage() {
                 </CardContent>
               </Card>
 
-              {/* AI Generation Section */}
+              {/* AI Generation - 2 Step Workflow */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Sparkles className="h-5 w-5" />
-                    Générer avec l'IA (Veo 3.1)
+                    Générer avec l'IA (2 étapes)
                   </CardTitle>
                   <CardDescription>
-                    Générez une vidéo animée à partir d'une image et d'un prompt
+                    1️⃣ Créez une image avec Recraft v3 → 2️⃣ Animez-la avec Veo 3.1
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  {/* Image Upload */}
-                  <div>
-                    <Label className="mb-2 block">Image source</Label>
-                    <div className="flex gap-4 items-start">
-                      <input
-                        type="file"
-                        ref={imageRef}
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0]
-                          if (file) handleImageUpload(file, activeTab)
-                        }}
-                      />
-                      
-                      {currentParams.imageUrl ? (
-                        <div className="relative">
-                          <img 
-                            src={currentParams.imageUrl} 
-                            alt="Source" 
-                            className="w-32 h-32 object-cover rounded-lg border"
+                  {/* Step Indicator */}
+                  <div className="flex items-center gap-4 p-4 rounded-lg" style={{ backgroundColor: 'var(--brand-secondary)' }}>
+                    <button
+                      onClick={() => setCurrentStep(1)}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
+                        currentStep === 1 ? 'bg-white shadow font-medium' : 'opacity-60 hover:opacity-80'
+                      }`}
+                    >
+                      <span className="w-6 h-6 rounded-full bg-purple-600 text-white text-sm flex items-center justify-center">1</span>
+                      <span>Générer l'image</span>
+                    </button>
+                    <ChevronRight className="h-5 w-5 opacity-40" />
+                    <button
+                      onClick={() => currentVideoParams.imageUrl && setCurrentStep(2)}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
+                        currentStep === 2 ? 'bg-white shadow font-medium' : 'opacity-60 hover:opacity-80'
+                      } ${!currentVideoParams.imageUrl ? 'cursor-not-allowed' : ''}`}
+                    >
+                      <span className={`w-6 h-6 rounded-full text-white text-sm flex items-center justify-center ${
+                        currentVideoParams.imageUrl ? 'bg-purple-600' : 'bg-gray-400'
+                      }`}>2</span>
+                      <span>Créer la vidéo</span>
+                    </button>
+                  </div>
+
+                  {/* STEP 1: Image Generation */}
+                  {currentStep === 1 && (
+                    <div className="space-y-4 p-4 border rounded-lg">
+                      <h3 className="font-semibold flex items-center gap-2">
+                        <ImageIcon className="h-5 w-5" />
+                        Étape 1 : Générer ou uploader une image
+                      </h3>
+
+                      {/* Image Prompt */}
+                      <div>
+                        <Label>Prompt pour l'image (Recraft v3)</Label>
+                        <Textarea
+                          value={currentImageParams.prompt}
+                          onChange={(e) => setCurrentImageParams(prev => ({ ...prev, prompt: e.target.value }))}
+                          placeholder="Décrivez l'image souhaitée..."
+                          className="mt-2 min-h-[80px]"
+                        />
+                      </div>
+
+                      {/* Image Parameters */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label>Taille</Label>
+                          <Select
+                            value={`${currentImageParams.width}x${currentImageParams.height}`}
+                            onValueChange={(value) => {
+                              const size = IMAGE_SIZES.find(s => s.value === value)
+                              if (size) {
+                                setCurrentImageParams(prev => ({ 
+                                  ...prev, 
+                                  width: size.width, 
+                                  height: size.height 
+                                }))
+                              }
+                            }}
+                          >
+                            <SelectTrigger className="mt-2">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {IMAGE_SIZES.map(size => (
+                                <SelectItem key={size.value} value={size.value}>
+                                  {size.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div>
+                          <Label>Style</Label>
+                          <Select
+                            value={currentImageParams.style}
+                            onValueChange={(value) => setCurrentImageParams(prev => ({ ...prev, style: value }))}
+                          >
+                            <SelectTrigger className="mt-2">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {IMAGE_STYLES.map(style => (
+                                <SelectItem key={style.value} value={style.value}>
+                                  {style.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      {/* Generate Image Button */}
+                      {isGeneratingImage ? (
+                        <div className="p-4 rounded-lg text-center bg-purple-600 text-white">
+                          <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+                          <p className="font-medium">Génération de l'image...</p>
+                          <p className="text-white/70 text-sm animate-pulse">{generationMessage}</p>
+                        </div>
+                      ) : (
+                        <div className="flex gap-2">
+                          <Button
+                            onClick={() => handleGenerateImage(activeTab)}
+                            disabled={!currentImageParams.prompt.trim()}
+                            className="flex-1"
+                          >
+                            <Sparkles className="h-4 w-4 mr-2" />
+                            Générer avec Recraft v3
+                          </Button>
+                          <span className="flex items-center text-gray-400">ou</span>
+                          <input
+                            type="file"
+                            ref={imageRef}
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0]
+                              if (file) handleImageUpload(file, activeTab)
+                            }}
                           />
                           <Button
-                            variant="ghost"
-                            size="sm"
-                            className="absolute -top-2 -right-2 h-6 w-6 p-0 rounded-full bg-red-500 text-white hover:bg-red-600"
-                            onClick={() => setCurrentParams(prev => ({ ...prev, imageUrl: '' }))}
+                            variant="outline"
+                            onClick={() => imageRef.current?.click()}
                           >
-                            ×
+                            <Upload className="h-4 w-4 mr-2" />
+                            Uploader
                           </Button>
+                        </div>
+                      )}
+
+                      {/* Preview of generated/uploaded image */}
+                      {currentVideoParams.imageUrl && (
+                        <div className="p-4 border rounded-lg bg-green-50 border-green-200">
+                          <div className="flex items-start gap-4">
+                            <img 
+                              src={currentVideoParams.imageUrl} 
+                              alt="Preview" 
+                              className="w-24 h-24 object-cover rounded-lg border"
+                            />
+                            <div className="flex-1">
+                              <p className="font-medium text-green-800">✅ Image prête</p>
+                              <p className="text-sm text-green-600">Passez à l'étape 2 pour créer la vidéo</p>
+                              <Button
+                                size="sm"
+                                className="mt-2"
+                                onClick={() => setCurrentStep(2)}
+                              >
+                                Continuer vers étape 2
+                                <ChevronRight className="h-4 w-4 ml-1" />
+                              </Button>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setCurrentVideoParams(prev => ({ ...prev, imageUrl: '' }))}
+                              className="text-red-500 hover:bg-red-100"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* STEP 2: Video Generation */}
+                  {currentStep === 2 && (
+                    <div className="space-y-4 p-4 border rounded-lg">
+                      <h3 className="font-semibold flex items-center gap-2">
+                        <Film className="h-5 w-5" />
+                        Étape 2 : Animer l'image avec Veo 3.1
+                      </h3>
+
+                      {/* Source Image Preview */}
+                      {currentVideoParams.imageUrl && (
+                        <div className="flex items-center gap-4 p-3 rounded-lg" style={{ backgroundColor: 'var(--brand-secondary)' }}>
+                          <img 
+                            src={currentVideoParams.imageUrl} 
+                            alt="Source" 
+                            className="w-20 h-20 object-cover rounded-lg border"
+                          />
+                          <div>
+                            <p className="font-medium">Image source</p>
+                            <button 
+                              onClick={() => setCurrentStep(1)}
+                              className="text-sm text-purple-600 hover:underline"
+                            >
+                              Changer l'image
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Video Prompt */}
+                      <div>
+                        <Label>Prompt pour l'animation (Veo 3.1)</Label>
+                        <Textarea
+                          value={currentVideoParams.prompt}
+                          onChange={(e) => setCurrentVideoParams(prev => ({ ...prev, prompt: e.target.value }))}
+                          placeholder="Décrivez l'animation souhaitée..."
+                          className="mt-2 min-h-[80px]"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Décrivez les mouvements de caméra, transitions et effets
+                        </p>
+                      </div>
+
+                      {/* Video Parameters Grid */}
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div>
+                          <Label>Format</Label>
+                          <Select
+                            value={currentVideoParams.aspectRatio}
+                            onValueChange={(value: '9:16' | '16:9') => 
+                              setCurrentVideoParams(prev => ({ ...prev, aspectRatio: value }))
+                            }
+                          >
+                            <SelectTrigger className="mt-2">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="9:16">9:16 (Portrait)</SelectItem>
+                              <SelectItem value="16:9">16:9 (Paysage)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div>
+                          <Label>Durée</Label>
+                          <Select
+                            value={currentVideoParams.duration}
+                            onValueChange={(value: '4s' | '6s' | '8s') => 
+                              setCurrentVideoParams(prev => ({ ...prev, duration: value }))
+                            }
+                          >
+                            <SelectTrigger className="mt-2">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="4s">4 secondes</SelectItem>
+                              <SelectItem value="6s">6 secondes</SelectItem>
+                              <SelectItem value="8s">8 secondes</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div>
+                          <Label>Résolution</Label>
+                          <Select
+                            value={currentVideoParams.resolution}
+                            onValueChange={(value: '720p' | '1080p') => 
+                              setCurrentVideoParams(prev => ({ ...prev, resolution: value }))
+                            }
+                          >
+                            <SelectTrigger className="mt-2">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="720p">720p</SelectItem>
+                              <SelectItem value="1080p">1080p</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div>
+                          <Label>Audio</Label>
+                          <Select
+                            value={currentVideoParams.generateAudio ? 'yes' : 'no'}
+                            onValueChange={(value) => 
+                              setCurrentVideoParams(prev => ({ ...prev, generateAudio: value === 'yes' }))
+                            }
+                          >
+                            <SelectTrigger className="mt-2">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="yes">Avec audio</SelectItem>
+                              <SelectItem value="no">Sans audio</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      {/* Generate Video Button */}
+                      {isGeneratingVideo ? (
+                        <div 
+                          className="p-6 rounded-xl text-center"
+                          style={{ backgroundColor: 'var(--brand-accent)', color: 'white' }}
+                        >
+                          <div className="flex justify-center mb-4">
+                            <div className="flex items-end gap-1 h-12">
+                              {[1, 2, 3, 4, 5].map((i) => (
+                                <div
+                                  key={i}
+                                  className="w-2 bg-white/80 rounded-full"
+                                  style={{
+                                    animation: 'soundWave 1s ease-in-out infinite',
+                                    animationDelay: `${i * 0.1}s`,
+                                    height: '40%',
+                                  }}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                          <p className="font-medium mb-1">Génération vidéo en cours</p>
+                          <p className="text-white/70 text-sm animate-pulse">{generationMessage}</p>
+                          <p className="text-white/50 text-xs mt-2">
+                            Cela peut prendre 2-3 minutes...
+                          </p>
                         </div>
                       ) : (
                         <Button
-                          variant="outline"
-                          onClick={() => imageRef.current?.click()}
-                          className="w-32 h-32 border-dashed"
+                          onClick={() => handleGenerateVideo(activeTab)}
+                          disabled={!currentVideoParams.imageUrl || !currentVideoParams.prompt.trim()}
+                          className="w-full"
+                          size="lg"
                         >
-                          <div className="flex flex-col items-center gap-1">
-                            <ImageIcon className="h-6 w-6" />
-                            <span className="text-xs">Ajouter</span>
-                          </div>
+                          <Film className="h-4 w-4 mr-2" />
+                          Générer la vidéo avec Veo 3.1
                         </Button>
                       )}
-                      
-                      <div className="flex-1">
-                        <p className="text-sm text-gray-500">
-                          Uploadez une image qui servira de base pour l'animation.
-                          Idéalement en 720p ou plus, format 9:16 ou 16:9.
-                        </p>
-                      </div>
                     </div>
-                  </div>
-
-                  {/* Prompt */}
-                  <div>
-                    <Label>Prompt de génération</Label>
-                    <Textarea
-                      value={currentParams.prompt}
-                      onChange={(e) => setCurrentParams(prev => ({ ...prev, prompt: e.target.value }))}
-                      placeholder="Décrivez l'animation souhaitée..."
-                      className="mt-2 min-h-[100px]"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Décrivez les mouvements, transitions et effets souhaités
-                    </p>
-                  </div>
-
-                  {/* Parameters Grid */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div>
-                      <Label>Format</Label>
-                      <Select
-                        value={currentParams.aspectRatio}
-                        onValueChange={(value: '9:16' | '16:9') => 
-                          setCurrentParams(prev => ({ ...prev, aspectRatio: value }))
-                        }
-                      >
-                        <SelectTrigger className="mt-2">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="9:16">9:16 (Portrait)</SelectItem>
-                          <SelectItem value="16:9">16:9 (Paysage)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div>
-                      <Label>Durée</Label>
-                      <Select
-                        value={currentParams.duration}
-                        onValueChange={(value: '4s' | '6s' | '8s') => 
-                          setCurrentParams(prev => ({ ...prev, duration: value }))
-                        }
-                      >
-                        <SelectTrigger className="mt-2">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="4s">4 secondes</SelectItem>
-                          <SelectItem value="6s">6 secondes</SelectItem>
-                          <SelectItem value="8s">8 secondes</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div>
-                      <Label>Résolution</Label>
-                      <Select
-                        value={currentParams.resolution}
-                        onValueChange={(value: '720p' | '1080p') => 
-                          setCurrentParams(prev => ({ ...prev, resolution: value }))
-                        }
-                      >
-                        <SelectTrigger className="mt-2">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="720p">720p</SelectItem>
-                          <SelectItem value="1080p">1080p</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div>
-                      <Label>Audio</Label>
-                      <Select
-                        value={currentParams.generateAudio ? 'yes' : 'no'}
-                        onValueChange={(value) => 
-                          setCurrentParams(prev => ({ ...prev, generateAudio: value === 'yes' }))
-                        }
-                      >
-                        <SelectTrigger className="mt-2">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="yes">Avec audio</SelectItem>
-                          <SelectItem value="no">Sans audio</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  {/* Generate Button */}
-                  {isGenerating ? (
-                    <div 
-                      className="p-6 rounded-xl text-center"
-                      style={{ backgroundColor: 'var(--brand-accent)', color: 'white' }}
-                    >
-                      <div className="flex justify-center mb-4">
-                        <div className="flex items-end gap-1 h-12">
-                          {[1, 2, 3, 4, 5].map((i) => (
-                            <div
-                              key={i}
-                              className="w-2 bg-white/80 rounded-full"
-                              style={{
-                                animation: 'soundWave 1s ease-in-out infinite',
-                                animationDelay: `${i * 0.1}s`,
-                                height: '40%',
-                              }}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                      <p className="font-medium mb-1">Génération en cours</p>
-                      <p className="text-white/70 text-sm animate-pulse">{generationMessage}</p>
-                      <p className="text-white/50 text-xs mt-2">
-                        Cela peut prendre 2-3 minutes...
-                      </p>
-                    </div>
-                  ) : (
-                    <Button
-                      onClick={() => handleGenerate(activeTab)}
-                      disabled={!currentParams.imageUrl || !currentParams.prompt.trim()}
-                      className="w-full"
-                      size="lg"
-                    >
-                      <Sparkles className="h-4 w-4 mr-2" />
-                      Générer l'{activeTab === 'intro' ? 'intro' : 'outro'} avec Veo 3.1
-                    </Button>
                   )}
                 </CardContent>
               </Card>

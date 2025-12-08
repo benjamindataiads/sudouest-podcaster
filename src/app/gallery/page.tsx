@@ -226,6 +226,9 @@ function GalleryPageContent() {
     setSelectedVideos(prev => prev.filter(v => v.id !== id).map((v, i) => ({ ...v, order: i })))
   }
 
+  // Progress message state for assembly
+  const [assembleMessage, setAssembleMessage] = useState('')
+
   const mergeSelectedVideos = async () => {
     if (selectedVideos.length === 0) {
       alert('Veuillez sélectionner au moins une vidéo')
@@ -234,7 +237,8 @@ function GalleryPageContent() {
 
     try {
       setIsMerging(true)
-      setProgress(10)
+      setProgress(0)
+      setAssembleMessage('Préparation des vidéos...')
 
       // Construire la liste des vidéos avec intro/outro optionnels
       const videoUrls: string[] = []
@@ -254,7 +258,19 @@ function GalleryPageContent() {
       console.log('🎬 Starting merge of', videoUrls.length, 'videos (intro:', includeIntro, 'outro:', includeOutro, ')')
       console.log('Video URLs:', videoUrls)
 
-      setProgress(30)
+      // Simulate progress with messages
+      const progressMessages = [
+        'Téléchargement des segments...',
+        'Normalisation des vidéos...',
+        'Concaténation en cours...',
+        'Encodage final...',
+        'Upload vers le stockage...',
+      ]
+      let messageIndex = 0
+      const progressInterval = setInterval(() => {
+        messageIndex = (messageIndex + 1) % progressMessages.length
+        setAssembleMessage(progressMessages[messageIndex])
+      }, 3000)
 
       const response = await fetch('/api/video/assemble', {
         method: 'POST',
@@ -266,13 +282,15 @@ function GalleryPageContent() {
         }),
       })
 
+      clearInterval(progressInterval)
+
       if (!response.ok) {
         const errorData = await response.json()
         console.error('Assemble error:', errorData)
         throw new Error(errorData.details || errorData.error || 'Erreur lors de l\'assemblage')
       }
 
-      setProgress(90)
+      setAssembleMessage('Finalisation...')
       const data = await response.json()
       console.log('✅ Merge completed:', data.videoUrl)
       setMergedVideoUrl(data.videoUrl)
@@ -283,8 +301,12 @@ function GalleryPageContent() {
     } finally {
       setIsMerging(false)
       setProgress(0)
+      setAssembleMessage('')
     }
   }
+
+  // Progress message state for subtitles
+  const [subtitleMessage, setSubtitleMessage] = useState('')
 
   // Generate subtitles for the merged video
   const generateSubtitles = async () => {
@@ -297,8 +319,24 @@ function GalleryPageContent() {
 
     try {
       setIsGeneratingSubtitles(true)
+      setSubtitleMessage('Analyse de la vidéo...')
       console.log('📝 Generating subtitles for:', videoToSubtitle)
       console.log('   Config:', subtitleConfig)
+
+      // Simulate progress with messages
+      const progressMessages = [
+        'Analyse de la vidéo...',
+        'Transcription audio...',
+        'Détection des mots...',
+        'Synchronisation...',
+        'Application du style...',
+        'Rendu final...',
+      ]
+      let messageIndex = 0
+      const progressInterval = setInterval(() => {
+        messageIndex = (messageIndex + 1) % progressMessages.length
+        setSubtitleMessage(progressMessages[messageIndex])
+      }, 4000)
 
       const response = await fetch('/api/genai/subtitle', {
         method: 'POST',
@@ -309,9 +347,18 @@ function GalleryPageContent() {
         }),
       })
 
+      clearInterval(progressInterval)
+
       if (!response.ok) {
         const errorData = await response.json()
-        throw new Error(errorData.details || errorData.error || 'Erreur lors de la génération des sous-titres')
+        console.error('Subtitle API error:', errorData)
+        
+        // Better error messages
+        let errorMessage = errorData.details || errorData.error || 'Erreur inconnue'
+        if (response.status === 422) {
+          errorMessage = 'Vidéo non supportée. Vérifiez que la vidéo est accessible et dans un format compatible (MP4).'
+        }
+        throw new Error(errorMessage)
       }
 
       const data = await response.json()
@@ -319,12 +366,12 @@ function GalleryPageContent() {
       console.log('   Subtitle count:', data.subtitleCount)
       
       setSubtitledVideoUrl(data.videoUrl)
-      alert(`✅ Sous-titres générés ! (${data.subtitleCount} segments)`)
     } catch (error) {
       console.error('❌ Erreur lors de la génération des sous-titres:', error)
       alert(`Erreur: ${error instanceof Error ? error.message : 'Erreur inconnue'}`)
     } finally {
       setIsGeneratingSubtitles(false)
+      setSubtitleMessage('')
     }
   }
 
@@ -672,30 +719,39 @@ function GalleryPageContent() {
                         </p>
                       </div>
 
-                      <Button
-                        onClick={mergeSelectedVideos}
-                        disabled={isMerging || selectedVideos.length === 0}
-                        className="w-full bg-gray-900 hover:bg-gray-800 text-white"
-                        size="lg"
-                      >
-                        {isMerging ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Assemblage en cours...
-                          </>
-                        ) : (
-                          <>
-                            <Film className="mr-2 h-4 w-4" />
-                            Assembler {selectedVideos.length} vidéo{selectedVideos.length > 1 ? 's' : ''}
-                          </>
-                        )}
-                      </Button>
-
-                      {isMerging && (
-                        <div className="space-y-2">
-                          <Progress value={progress} className="h-2" />
-                          <p className="text-xs text-center text-gray-500">{progress}%</p>
+                      {isMerging ? (
+                        <div className="p-6 rounded-xl text-center bg-gray-900 text-white">
+                          <div className="flex justify-center mb-4">
+                            <div className="flex items-end gap-1 h-12">
+                              {[1, 2, 3, 4, 5].map((i) => (
+                                <div
+                                  key={i}
+                                  className="w-2 bg-white/80 rounded-full"
+                                  style={{
+                                    animation: 'soundWave 1s ease-in-out infinite',
+                                    animationDelay: `${i * 0.1}s`,
+                                    height: '40%',
+                                  }}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                          <p className="font-medium mb-1">Assemblage en cours</p>
+                          <p className="text-white/70 text-sm animate-pulse">{assembleMessage}</p>
+                          <p className="text-white/50 text-xs mt-2">
+                            Cela peut prendre plusieurs minutes...
+                          </p>
                         </div>
+                      ) : (
+                        <Button
+                          onClick={mergeSelectedVideos}
+                          disabled={selectedVideos.length === 0}
+                          className="w-full bg-gray-900 hover:bg-gray-800 text-white"
+                          size="lg"
+                        >
+                          <Film className="mr-2 h-4 w-4" />
+                          Assembler {selectedVideos.length} vidéo{selectedVideos.length > 1 ? 's' : ''}
+                        </Button>
                       )}
                     </div>
                   )}
@@ -945,27 +1001,42 @@ function GalleryPageContent() {
                     )}
 
                     {/* Generate button */}
-                    <Button
-                      onClick={generateSubtitles}
-                      disabled={isGeneratingSubtitles}
-                      className="w-full bg-purple-600 hover:bg-purple-700 text-white"
-                      size="lg"
-                    >
-                      {isGeneratingSubtitles ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Génération des sous-titres en cours...
-                        </>
-                      ) : (
-                        <>
-                          <Type className="mr-2 h-4 w-4" />
-                          {subtitledVideoUrl ? 'Régénérer les sous-titres' : 'Générer les sous-titres'}
-                        </>
-                      )}
-                    </Button>
+                    {isGeneratingSubtitles ? (
+                      <div className="p-6 rounded-xl text-center bg-purple-600 text-white">
+                        <div className="flex justify-center mb-4">
+                          <div className="flex items-end gap-1 h-12">
+                            {[1, 2, 3, 4, 5].map((i) => (
+                              <div
+                                key={i}
+                                className="w-2 bg-white/80 rounded-full"
+                                style={{
+                                  animation: 'soundWave 1s ease-in-out infinite',
+                                  animationDelay: `${i * 0.1}s`,
+                                  height: '40%',
+                                }}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                        <p className="font-medium mb-1">Génération des sous-titres</p>
+                        <p className="text-white/70 text-sm animate-pulse">{subtitleMessage}</p>
+                        <p className="text-white/50 text-xs mt-2">
+                          Cela peut prendre plusieurs minutes...
+                        </p>
+                      </div>
+                    ) : (
+                      <Button
+                        onClick={generateSubtitles}
+                        className="w-full bg-purple-600 hover:bg-purple-700 text-white"
+                        size="lg"
+                      >
+                        <Type className="mr-2 h-4 w-4" />
+                        {subtitledVideoUrl ? 'Régénérer les sous-titres' : 'Générer les sous-titres'}
+                      </Button>
+                    )}
 
                     {/* Preview info */}
-                    {!subtitledVideoUrl && (
+                    {!subtitledVideoUrl && !isGeneratingSubtitles && (
                       <p className="text-xs text-center text-gray-500">
                         Les sous-titres seront générés automatiquement en français (style TikTok/karaoké)
                       </p>
